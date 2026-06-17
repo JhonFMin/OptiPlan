@@ -1,0 +1,2533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OptiPlan — Planificación de Producción</title>
+  <script>if('scrollRestoration'in history)history.scrollRestoration='manual';try{window.scrollTo(0,0);}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Megrim&family=Anek+Bangla:wght@300;400;500;600;700&family=Baloo+Tamma+2:wght@400;500;600;700;800&family=Iosevka+Charon+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:          #0b2b26;
+      --surface:     #225044;
+      --surface2:    #34745d;
+      --surface3:    #1a3d35;
+      --text:        #e2ddcf;
+      --text-soft:   #e2ebd8;
+      --text-muted:  #a0bab1;
+      --accent:      #34745d;
+      --accent2:     #a1bbb2;
+      --border:      rgba(255,255,255,.2);
+      --border-soft: rgba(255,255,255,.08);
+      --glass:       rgba(226,221,207,.3);
+      --glass2:      rgba(255,255,255,.12);
+      --danger:      #dc2626;
+      --danger-soft: rgba(220,38,38,.15);
+      --warning:     #e6bc6c;
+      --verde-claro: #a1bbb2;
+      --verde-oscuro: #0b2b26;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: 'Baloo Tamma 2', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      background: var(--surface);
+      box-shadow: 0 4px 10px rgba(0,0,0,.4);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 60px;
+    }
+    .nav-logo {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1.4rem; font-weight: 700;
+      color: var(--text); letter-spacing: .04em;
+    }
+    .nav-links { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .nav-links button {
+      background: none; border: none; color: rgba(226,221,207,.7);
+      font-family: 'Baloo Tamma 2', sans-serif;
+      font-size: .85rem; cursor: pointer; padding: .35rem .75rem;
+      border-radius: 9999px; transition: color .2s, background .2s;
+    }
+    .nav-links button:hover { color: var(--text); background: rgba(255,255,255,.1); }
+    .nav-links button.active { color: var(--text); background: rgba(255,255,255,.15); font-weight: 600; }
+
+    /* ── SCROLL LAYOUT ── */
+    html { scroll-behavior: smooth; }
+
+    /* Todas las secciones siempre en flujo */
+    .view { min-height: 100vh; scroll-margin-top: 60px; }
+
+    /* Inicio: siempre visible, flex centrado */
+    #view-inicio {
+      position: relative; overflow: hidden;
+      min-height: 100vh; background: #0b2b26;
+      display: flex; align-items: center; justify-content: center;
+      padding-top: 60px;
+      z-index: 1;
+    }
+
+    /* Datos: siempre visible, por debajo de inicio en stacking */
+    #view-datos { display: block; position: relative; z-index: 0; }
+
+    /* Secciones de resultado: ocultas hasta que se resuelva */
+    #view-resultados, #view-estadisticas, #view-escenarios { display: none; }
+
+    /* Clase que revela una sección con animación */
+    .view.revealed {
+      display: block !important;
+      animation: revealSection .5s cubic-bezier(.22,.68,0,1.1) both;
+    }
+    @keyframes revealSection {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #particles-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;
+    }
+    .hero-center {
+      position: relative; z-index: 2;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 1.5rem; text-align: center; padding: 2rem 2rem;
+    }
+    .megrim-title {
+      font-family: 'Megrim', cursive;
+      font-size: clamp(5rem, 14vw, 11rem);
+      font-weight: 400;
+      color: transparent;
+      -webkit-text-stroke: 2.5px #e2ddcf;
+      letter-spacing: .06em;
+      line-height: 1;
+      text-shadow: 0 0 60px rgba(226,221,207,.12), 0 0 120px rgba(52,116,93,.25);
+    }
+    .hero-desc {
+      font-family: 'Baloo Tamma 2', sans-serif;
+      font-size: 1.1rem; color: rgba(226,221,207,.75);
+      line-height: 1.7; max-width: 480px;
+    }
+    .btn-primary {
+      background: var(--surface2); color: var(--text);
+      border: 1.5px solid rgba(255,255,255,.3);
+      padding: .9rem 3rem; border-radius: 9999px;
+      font-family: 'Baloo Tamma 2', sans-serif;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 7px rgba(0,0,0,.4);
+      transition: transform .2s, box-shadow .2s, background .2s;
+      letter-spacing: .03em;
+    }
+    .btn-primary:hover { transform: translateY(-2px); background: #3d8a6e; box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+
+    /* ── DATOS (LIGHT THEME) ── */
+    #view-datos {
+      background: url('/fondo-datos.jpg') center/cover no-repeat;
+    }
+    #view-datos::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(245,240,230,.55); z-index: 0; pointer-events: none;
+    }
+    #view-datos .container { position: relative; z-index: 1; }
+    #view-datos .page-title { color: #2d2d2d; border-bottom-color: rgba(0,0,0,.15); }
+    #view-datos .card {
+      background: rgba(255,255,255,.72);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 24px; backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+    }
+    #view-datos .card-title { color: #1a3a30; }
+    #view-datos .form-group label { color: #5a6a65; }
+    #view-datos .form-group input,
+    #view-datos .form-group select {
+      background: rgba(255,255,255,.8);
+      border: 1px solid rgba(0,0,0,.15);
+      color: #2d2d2d; border-radius: 12px;
+    }
+    #view-datos .form-group input:focus,
+    #view-datos .form-group select:focus { border-color: #34745d; }
+    #view-datos .form-group input[type="checkbox"] { accent-color: #34745d; }
+    #view-datos thead tr { background: rgba(34,80,68,.12); }
+    #view-datos thead th { color: #1a3a30; font-family: 'Anek Bangla', sans-serif; }
+    #view-datos tbody tr:nth-child(odd)  { background: rgba(255,255,255,.5); }
+    #view-datos tbody tr:nth-child(even) { background: rgba(0,0,0,.04); }
+    #view-datos tbody td { color: #2d2d2d; border-bottom-color: rgba(0,0,0,.07); }
+    #view-datos tbody td.name { color: #1a3a30; }
+    #view-datos tbody td input { background: rgba(255,255,255,.85); border-color: rgba(0,0,0,.12); color: #2d2d2d; }
+    #view-datos .btn-sm.success { background: #34745d; color: #fff; border: none; }
+    #view-datos .btn-sm.outline { background: rgba(255,255,255,.7); color: #3a4a45; border-color: rgba(0,0,0,.15); }
+    #view-datos .btn-sm.outline:hover { border-color: #34745d; color: #34745d; }
+    #view-datos .btn-sm.save  { background: rgba(52,116,93,.15); color: #1a3a30; border-color: rgba(52,116,93,.4); }
+    #view-datos .btn-sm.load  { background: rgba(161,187,178,.2); color: #1a3a30; border-color: rgba(161,187,178,.5); }
+    #view-datos .btn-sm.recent { background: rgba(230,188,108,.15); color: #7a5a20; border-color: rgba(230,188,108,.4); }
+    #view-datos .alert.info { background: rgba(230,188,108,.1); border-color: rgba(230,188,108,.3); color: #7a5a20; }
+    #view-datos .alert.success { background: rgba(52,116,93,.1); border-color: rgba(52,116,93,.3); color: #1a3a30; }
+    #view-datos .alert.error { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.25); color: #991b1b; }
+    #view-datos #historial-panel { background: #fff; border-color: rgba(0,0,0,.12); }
+    #view-datos .hist-header { background: #f0ede5; color: #1a3a30; border-bottom-color: rgba(0,0,0,.1); }
+    #view-datos .hist-item:hover { background: #f5f0e8; }
+    #view-datos .hist-nombre { color: #2d2d2d; }
+    #view-datos .hist-meta, #view-datos .hist-empty { color: #7a8a85; }
+    #view-datos .hist-btn.cargar { color: #34745d; }
+    #view-datos .hist-footer { border-top-color: rgba(0,0,0,.1); }
+    #view-datos #modal-guardar { background: #fff; border-color: rgba(0,0,0,.12); }
+    #view-datos #modal-guardar h3 { color: #1a3a30; }
+    #view-datos #modal-guardar p { color: #7a8a85; }
+    #view-datos #modal-nombre-sesion { background: #f5f0e8; border-color: rgba(0,0,0,.15); color: #2d2d2d; }
+    #view-datos .modal-actions .btn-confirm { background: #34745d; color: #fff; }
+    #view-datos .modal-actions .btn-cancel { color: #7a8a85; border-color: rgba(0,0,0,.15); }
+
+    /* ── RESULTADOS (FONDO BRONCE) ── */
+    #view-resultados {
+      background: url('/fondo-resultados.jpg') center/cover no-repeat;
+      position: relative;
+    }
+    #view-resultados::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(20,12,5,.65); z-index: 0; pointer-events: none;
+    }
+    #view-resultados .container { position: relative; z-index: 1; }
+    #view-resultados .page-title { color: #e8d5b0; border-bottom-color: rgba(232,213,176,.2); }
+    #view-resultados .card {
+      background: rgba(20,12,5,.45);
+      border: 1px solid rgba(232,213,176,.2);
+      backdrop-filter: blur(8px);
+    }
+    #view-resultados .card-title { color: #e8d5b0; }
+    #view-resultados .kpi {
+      background: rgba(20,12,5,.5);
+      border: 1px solid rgba(232,213,176,.2);
+      backdrop-filter: blur(6px);
+    }
+    #view-resultados .kpi-label { color: rgba(232,213,176,.65); }
+    #view-resultados .kpi-value { color: #e8d5b0; }
+    #view-resultados .kpi-value.negative { color: #fca5a5; }
+    #view-resultados thead tr { background: rgba(232,213,176,.1); }
+    #view-resultados thead th { color: #e8d5b0; }
+    #view-resultados tbody tr:nth-child(odd) { background: rgba(255,255,255,.04); }
+    #view-resultados tbody tr:nth-child(even) { background: rgba(0,0,0,.12); }
+    #view-resultados tbody td { color: #d4c4a0; border-bottom-color: rgba(232,213,176,.08); }
+    #view-resultados tbody td.name { color: #e8d5b0; }
+    .kpi-icon { width: 54px; height: 54px; object-fit: contain; margin: 0 auto .5rem; display: block; filter: brightness(0) invert(1); opacity: .92; }
+
+    /* ── ESTADÍSTICAS (FONDO VERDE) ── */
+    #view-estadisticas {
+      background: url('/fondo-estadisticas.jpg') center/cover no-repeat;
+      position: relative;
+    }
+    #view-estadisticas::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(5,20,15,.6); z-index: 0; pointer-events: none;
+    }
+    #view-estadisticas .container { position: relative; z-index: 1; }
+    #view-estadisticas .page-title { color: #a1bbb2; border-bottom-color: rgba(161,187,178,.2); }
+    #view-estadisticas .chart-card {
+      background: rgba(5,20,15,.5);
+      border: 1px solid rgba(161,187,178,.2);
+      backdrop-filter: blur(8px);
+    }
+    #view-estadisticas .chart-title { color: #a1bbb2; }
+
+    /* ── ESCENARIOS ── */
+    #view-escenarios {
+      background: url('/fondo-estadisticas.jpg') center/cover no-repeat;
+      position: relative;
+    }
+    #view-escenarios::before {
+      content: ''; position: absolute; inset: 0;
+      background: rgba(5,20,15,.62); z-index: 0; pointer-events: none;
+    }
+    #view-escenarios .container { position: relative; z-index: 1; }
+    #view-escenarios .page-title { color: #a1bbb2; border-bottom-color: rgba(161,187,178,.2); }
+    #view-escenarios .esc-card {
+      background: rgba(5,20,15,.45);
+      border: 1px solid rgba(161,187,178,.2);
+      backdrop-filter: blur(8px);
+    }
+    #view-escenarios .esc-nombre { color: #e2ddcf; }
+    #view-escenarios .esc-desc { color: #a1bbb2; }
+    #view-escenarios .chart-card {
+      background: rgba(5,20,15,.45);
+      border: 1px solid rgba(161,187,178,.2);
+      backdrop-filter: blur(8px); margin-top: 1.25rem;
+    }
+    #view-escenarios .chart-title { color: #a1bbb2; }
+
+    /* ── MODALES SOBRE / AYUDA ── */
+    .info-modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 8000;
+      background: rgba(0,0,0,.65); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    .info-modal-overlay.visible { display: flex; }
+    .info-modal-close {
+      position: absolute; top: 1.1rem; right: 1.1rem;
+      background: rgba(255,255,255,.1); border: none; color: var(--text);
+      width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+      font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .info-modal-close:hover { background: rgba(255,255,255,.2); }
+    .info-modal h2 {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1.4rem; font-weight: 700; color: var(--text);
+      margin-bottom: 1rem; padding-right: 2rem;
+    }
+
+    .btn-secondary {
+      background: transparent; color: var(--text);
+      border: 1.5px solid rgba(255,255,255,.4); padding: .7rem 1.8rem;
+      border-radius: 9999px; font-size: .9rem; font-weight: 500; cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,.12); }
+    .btn-danger {
+      background: transparent; color: var(--danger);
+      border: 1.5px solid var(--danger); padding: .5rem 1.2rem;
+      border-radius: 9999px; font-size: .85rem; cursor: pointer; transition: background .2s;
+    }
+    .btn-danger:hover { background: var(--danger-soft); }
+
+    /* ── CONTENEDOR ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .page-title {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1.8rem; font-weight: 700; color: var(--text);
+      margin-bottom: 1.5rem; padding-bottom: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: rgba(226,221,207,.15);
+      border: 1.5px solid rgba(255,255,255,.2);
+      border-radius: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25);
+      padding: 1.5rem; margin-bottom: 1.25rem;
+      backdrop-filter: blur(4px);
+    }
+    .card-title {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1.05rem; font-weight: 600; color: var(--text);
+      margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem;
+    }
+
+    /* ── FORM ── */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
+    .form-group { display: flex; flex-direction: column; gap: .3rem; }
+    .form-group label { font-size: .78rem; color: var(--text-muted); font-weight: 500; }
+    .form-group input, .form-group select {
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.18);
+      color: var(--text); border-radius: 12px; padding: .5rem .85rem;
+      font-size: .9rem; outline: none; transition: border .2s;
+      font-family: 'Baloo Tamma 2', sans-serif;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: rgba(255,255,255,.55); }
+    .form-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--text); }
+
+    /* ── TABLA ── */
+    .table-wrap { overflow-x: auto; border-radius: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead tr { background: rgba(0,0,0,.3); }
+    thead th {
+      padding: .65rem .75rem; text-align: center;
+      font-family: 'Anek Bangla', sans-serif;
+      font-weight: 600; color: var(--text); white-space: nowrap;
+    }
+    tbody tr:nth-child(odd)  { background: rgba(255,255,255,.04); }
+    tbody tr:nth-child(even) { background: rgba(0,0,0,.12); }
+    tbody td { padding: .5rem .75rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,.07); color: var(--text-soft); }
+    tbody td.name { font-weight: 600; color: var(--text); }
+    tbody td input {
+      background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.15); color: var(--text);
+      border-radius: 8px; padding: .3rem .5rem; width: 80px; text-align: center;
+      font-size: .85rem; font-family: 'Baloo Tamma 2', sans-serif;
+    }
+    tbody td input:focus { outline: none; border-color: rgba(255,255,255,.5); }
+
+    /* ── BOTONES ACCION ── */
+    .actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: center; }
+    .btn-sm {
+      padding: .5rem 1.2rem; border-radius: 9999px; font-size: .85rem;
+      font-family: 'Baloo Tamma 2', sans-serif;
+      font-weight: 600; cursor: pointer; border: none; transition: all .2s;
+    }
+    .btn-sm.success {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid rgba(255,255,255,.25);
+      box-shadow: 0 4px 7px rgba(0,0,0,.3);
+    }
+    .btn-sm.success:hover { background: #3d8a6e; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+    .btn-sm.outline {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .btn-sm.outline:hover { border-color: rgba(255,255,255,.5); color: var(--text); }
+    .btn-sm.pdf {
+      background: #7f1d1d; color: var(--text);
+      border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 4px 7px rgba(0,0,0,.3);
+    }
+    .btn-sm.pdf:hover { background: #991b1b; }
+
+    /* ── ALERT ── */
+    .alert {
+      border-radius: 16px; padding: .85rem 1.1rem; margin-bottom: 1rem;
+      font-size: .88rem; display: flex; align-items: center; gap: .5rem;
+      backdrop-filter: blur(4px);
+    }
+    .alert.error   { background: var(--danger-soft); border: 1px solid rgba(220,38,38,.4); color: #fca5a5; }
+    .alert.success { background: rgba(161,187,178,.15); border: 1px solid rgba(255,255,255,.2); color: var(--text); }
+    .alert.info    { background: rgba(230,188,108,.1); border: 1px solid rgba(230,188,108,.3); color: var(--warning); }
+
+    /* ── KPI ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+    .kpi {
+      background: rgba(226,221,207,.15);
+      border: 1.5px solid rgba(255,255,255,.2);
+      border-radius: 24px;
+      box-shadow: 0 4px 8px rgba(0,0,0,.25);
+      padding: 1.1rem; text-align: center;
+      backdrop-filter: blur(4px);
+    }
+    .kpi-label { font-size: .72rem; color: var(--text-muted); margin-bottom: .3rem; text-transform: uppercase; letter-spacing: .06em; }
+    .kpi-value { font-family: 'Anek Bangla', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+    .kpi-value.negative { color: #fca5a5; }
+
+    /* ── CHARTS ── */
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 1.25rem; }
+    .chart-card {
+      background: rgba(226,221,207,.12);
+      border: 1.5px solid rgba(255,255,255,.18);
+      border-radius: 24px;
+      box-shadow: 0 4px 8px rgba(0,0,0,.2);
+      padding: 1.25rem;
+      backdrop-filter: blur(4px);
+    }
+    .chart-title {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: 1rem;
+    }
+    .chart-wrap  { position: relative; height: 240px; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: .5rem; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,.12); padding-bottom: .5rem; }
+    .tab {
+      background: none; border: none; color: var(--text-muted);
+      font-family: 'Baloo Tamma 2', sans-serif;
+      font-size: .88rem; padding: .4rem .9rem; border-radius: 9999px;
+      cursor: pointer; transition: all .2s;
+    }
+    .tab.active {
+      background: rgba(255,255,255,.15); color: var(--text);
+      border: 1px solid rgba(255,255,255,.2);
+    }
+
+    /* ── ESCENARIOS ── */
+    .esc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
+    .esc-card {
+      background: rgba(226,221,207,.1);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+      padding: 1.6rem 1.5rem;
+      backdrop-filter: blur(6px);
+      display: flex; flex-direction: column; gap: .5rem;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .esc-card:hover { transform: translateY(-3px); box-shadow: 0 14px 36px rgba(0,0,0,.35); }
+    .esc-badge {
+      display: inline-block; align-self: flex-start;
+      background: rgba(52,116,93,.4); border: 1px solid rgba(52,116,93,.5);
+      color: #a1bbb2; font-size: .68rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; padding: .2rem .65rem; border-radius: 9999px; margin-bottom: .25rem;
+    }
+    .esc-badge.infeasible { background: rgba(239,68,68,.25); border-color: rgba(239,68,68,.4); color: #fca5a5; }
+    .esc-nombre {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.3;
+    }
+    .esc-desc { font-size: .78rem; color: var(--text-muted); line-height: 1.5; }
+    .esc-divider { border: none; border-top: 1px solid rgba(255,255,255,.1); margin: .4rem 0; }
+    .esc-utilidad { font-family: 'Anek Bangla', sans-serif; font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+    .esc-costo { font-size: .75rem; color: var(--text-muted); margin-top: .1rem; }
+    .esc-delta {
+      font-size: .78rem; font-weight: 600; padding: .2rem .5rem;
+      border-radius: 9999px; align-self: flex-start;
+    }
+    .esc-delta.pos { background: rgba(52,116,93,.3); color: #a1bbb2; }
+    .esc-delta.neg { background: rgba(239,68,68,.2); color: #fca5a5; }
+    .esc-delta.base { background: rgba(230,188,108,.2); color: #e6bc6c; }
+
+    /* ── SPINNER ── */
+    .spinner-wrap { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 2rem; color: var(--text-muted); }
+    .spinner {
+      width: 26px; height: 26px; border: 3px solid rgba(255,255,255,.15);
+      border-top-color: var(--text); border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── SOBRE / AYUDA ── */
+    .prose { color: var(--text-muted); line-height: 1.75; font-size: .93rem; }
+    .prose h3 {
+      font-family: 'Anek Bangla', sans-serif;
+      color: var(--text); margin: 1.25rem 0 .5rem; font-size: 1.1rem;
+    }
+    .prose ul { padding-left: 1.4rem; }
+    .prose li { margin-bottom: .3rem; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      color: var(--text); padding: .2rem .8rem; border-radius: 9999px;
+      font-size: .78rem; font-weight: 600; margin: .2rem;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 4px; }
+
+    /* animación de entrada para secciones de resultados al revelarlas */
+
+    /* ── DEGRADADOS DE FUSIÓN ENTRE SECCIONES (intensidad media) ── */
+    #view-inicio::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 110px;
+      background: linear-gradient(to bottom, transparent, rgba(206,197,175,.48));
+      z-index: 2; pointer-events: none;
+    }
+    #view-datos::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 130px;
+      background: linear-gradient(to bottom, transparent, rgba(14,6,2,.44));
+      z-index: 0; pointer-events: none;
+    }
+    #view-resultados::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 110px;
+      background: linear-gradient(to bottom, transparent, rgba(4,18,11,.46));
+      z-index: 0; pointer-events: none;
+    }
+    #view-estadisticas::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 110px;
+      background: linear-gradient(to bottom, transparent, rgba(6,12,10,.46));
+      z-index: 0; pointer-events: none;
+    }
+
+    /* ── SIDE NAV DOTS ── */
+    #side-nav {
+      position: fixed; left: 1.1rem; top: 50%; transform: translateY(-50%);
+      z-index: 8000; display: flex; flex-direction: column; gap: .55rem;
+      align-items: center;
+    }
+    .side-dot {
+      width: 7px; height: 7px; border-radius: 9999px;
+      background: rgba(255,255,255,.2);
+      border: 1.5px solid rgba(255,255,255,.28);
+      cursor: pointer; padding: 0;
+      transition: width .25s cubic-bezier(.22,.68,0,1.2),
+                  height .25s cubic-bezier(.22,.68,0,1.2),
+                  background .2s, border-color .2s, transform .2s;
+      position: relative;
+    }
+    .side-dot::after {
+      content: attr(title);
+      position: absolute; left: calc(100% + 12px); top: 50%;
+      transform: translateY(-50%);
+      background: rgba(8,30,22,.92); color: var(--text);
+      font-size: .7rem; padding: .22rem .6rem; border-radius: 6px;
+      white-space: nowrap; opacity: 0;
+      transition: opacity .15s; pointer-events: none;
+      font-family: 'Baloo Tamma 2', sans-serif;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .side-dot:hover::after { opacity: 1; }
+    .side-dot:hover { background: rgba(255,255,255,.5); border-color: rgba(255,255,255,.55); transform: scale(1.25); }
+    .side-dot.active {
+      height: 22px; background: rgba(255,255,255,.85);
+      border-color: rgba(255,255,255,.88);
+    }
+    .side-dot.result-dot { opacity: 0; pointer-events: none;
+      transition: opacity .4s, width .25s cubic-bezier(.22,.68,0,1.2),
+                  height .25s cubic-bezier(.22,.68,0,1.2),
+                  background .2s, border-color .2s, transform .2s; }
+    .side-dot.result-dot.shown { opacity: 1; pointer-events: auto; }
+    @media (max-width: 600px) { #side-nav { display: none; } }
+
+    /* ── CHARTS RESPONSIVO ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+      gap: 1.25rem;
+    }
+    #view-estadisticas .container,
+    #view-escenarios .container {
+      max-width: 1400px;
+    }
+
+    /* ── MODAL SCROLL FIX ── */
+    .info-modal {
+      background: var(--surface);
+      border: 1.5px solid rgba(255,255,255,.2);
+      border-radius: 28px; padding: 0;
+      width: min(640px, 92vw); max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      position: relative;
+      display: flex; flex-direction: column;
+    }
+    .info-modal-header {
+      padding: 2.5rem 2.5rem 0;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .info-modal-body {
+      padding: 0 2.5rem 2.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .info-modal-body::-webkit-scrollbar { width: 5px; }
+    .info-modal-body::-webkit-scrollbar-track { background: transparent; }
+    .info-modal-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
+
+    /* ── GLASS EN DATOS ── */
+    #view-datos .card {
+      background: rgba(255,255,255,.35) !important;
+      border: 1px solid rgba(255,255,255,.5) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,.12) !important;
+    }
+
+    /* ── GLASS EN ESTADÍSTICAS ── */
+    #view-estadisticas .chart-card {
+      background: rgba(5,20,15,.38) !important;
+      border: 1px solid rgba(161,187,178,.22) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3) !important;
+    }
+
+    /* ── GLASS EN ESCENARIOS ── */
+    #view-escenarios .esc-card {
+      background: rgba(5,20,15,.38) !important;
+      border: 1px solid rgba(161,187,178,.22) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3) !important;
+    }
+    #view-escenarios .chart-card {
+      background: rgba(5,20,15,.38) !important;
+      border: 1px solid rgba(161,187,178,.22) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3) !important;
+    }
+
+    /* ── CHAT AI BUBBLE ── */
+    #ai-chat-bubble {
+      position: fixed; bottom: 1.75rem; right: 1.75rem; z-index: 8500;
+      display: none;
+    }
+    #ai-chat-bubble.visible { display: block; }
+    #ai-chat-toggle {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, #34745d, #225044);
+      border: 1.5px solid rgba(255,255,255,.3);
+      box-shadow: 0 8px 28px rgba(0,0,0,.5);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s, box-shadow .2s;
+      position: relative;
+    }
+    #ai-chat-toggle:hover { transform: scale(1.08); box-shadow: 0 12px 36px rgba(0,0,0,.6); }
+    .ai-toggle-label {
+      font-family: 'Megrim', cursive;
+      font-size: 1.25rem; font-weight: 400;
+      letter-spacing: .12em;
+      color: transparent;
+      -webkit-text-stroke: 1.2px rgba(226,221,207,.95);
+      text-shadow: 0 0 14px rgba(161,187,178,.5);
+      line-height: 1; user-select: none;
+    }
+    #ai-chat-badge {
+      position: absolute; top: -4px; right: -4px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #e6bc6c; border: 2px solid var(--bg);
+      font-size: .62rem; font-weight: 700; color: #2d1a00;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #ai-chat-panel {
+      position: absolute; bottom: 78px; right: 0;
+      width: min(380px, 92vw);
+      background: rgba(11,43,38,.95);
+      border: 1.5px solid rgba(255,255,255,.18);
+      border-radius: 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.65);
+      backdrop-filter: blur(20px);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      transform-origin: bottom right;
+      transition: transform .25s cubic-bezier(.22,.68,0,1.2), opacity .2s;
+      transform: scale(.85); opacity: 0; pointer-events: none;
+    }
+    #ai-chat-panel.open { transform: scale(1); opacity: 1; pointer-events: all; }
+    .ai-chat-header {
+      padding: .85rem 1.1rem;
+      background: rgba(34,80,68,.7);
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      display: flex; align-items: center; gap: .65rem;
+    }
+    .ai-chat-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: linear-gradient(135deg,#34745d,#a1bbb2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .ai-chat-name { font-family: 'Anek Bangla',sans-serif; font-size: .92rem; font-weight: 600; color: var(--text); }
+    .ai-chat-status { font-size: .72rem; color: #a1bbb2; }
+    .ai-chat-close {
+      margin-left: auto; background: none; border: none;
+      color: var(--text-muted); cursor: pointer; font-size: 1.1rem;
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .ai-chat-close:hover { background: rgba(255,255,255,.12); color: var(--text); }
+    .ai-chat-messages {
+      flex: 1; overflow-y: auto; padding: .9rem;
+      display: flex; flex-direction: column; gap: .65rem;
+      max-height: 320px; min-height: 180px;
+    }
+    .ai-chat-messages::-webkit-scrollbar { width: 4px; }
+    .ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
+    .ai-msg {
+      max-width: 90%; padding: .55rem .85rem;
+      border-radius: 16px; font-size: .83rem; line-height: 1.55;
+    }
+    .ai-msg.bot {
+      background: rgba(52,116,93,.35);
+      border: 1px solid rgba(161,187,178,.2);
+      color: var(--text-soft); align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .ai-msg.user {
+      background: rgba(226,221,207,.15);
+      border: 1px solid rgba(255,255,255,.15);
+      color: var(--text); align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .ai-msg.typing { opacity: .6; font-style: italic; }
+    .ai-quick-btns {
+      padding: .5rem .9rem;
+      display: flex; flex-wrap: wrap; gap: .35rem;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .ai-quick-btn {
+      background: rgba(52,116,93,.25);
+      border: 1px solid rgba(161,187,178,.25);
+      color: #a1bbb2; border-radius: 9999px;
+      font-size: .72rem; padding: .28rem .65rem;
+      cursor: pointer; font-family: 'Baloo Tamma 2',sans-serif;
+      transition: background .15s, color .15s;
+    }
+    .ai-quick-btn:hover { background: rgba(52,116,93,.5); color: var(--text); }
+    .ai-chat-input-row {
+      display: flex; gap: .5rem; padding: .7rem .9rem;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    #ai-chat-input {
+      flex: 1; background: rgba(0,0,0,.3);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 9999px; padding: .45rem .9rem;
+      color: var(--text); font-size: .82rem;
+      font-family: 'Baloo Tamma 2',sans-serif;
+      outline: none; transition: border-color .2s;
+    }
+    #ai-chat-input:focus { border-color: rgba(161,187,178,.5); }
+    #ai-chat-input::placeholder { color: rgba(160,186,177,.4); }
+    #ai-chat-send {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #34745d; border: none; color: #fff;
+      cursor: pointer; font-size: .95rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .15s;
+    }
+    /* ── CHAT PANEL RESPONSIVE ── */
+    @media (max-width: 600px) {
+      #ai-chat-bubble { bottom: .9rem; right: .9rem; }
+      #ai-chat-panel {
+        position: fixed; bottom: 0; right: 0; left: 0;
+        width: 100% !important; border-radius: 20px 20px 0 0;
+        max-height: 72vh;
+      }
+      .ai-chat-messages { max-height: 38vh; min-height: 120px; }
+      .ai-quick-btns { gap: .25rem; }
+      .ai-quick-btn { font-size: .68rem; padding: .22rem .5rem; }
+    }
+    @media (max-width: 400px) {
+      #ai-chat-panel { max-height: 80vh; }
+      .ai-chat-name { font-size: .82rem; }
+      #ai-chat-input { font-size: .78rem; }
+    }
+    #ai-chat-send:hover { background: #3d8a6e; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,.25);
+      color: var(--text); padding: .7rem 1.3rem; border-radius: 9999px;
+      font-size: .88rem; font-weight: 500; box-shadow: 0 8px 30px rgba(0,0,0,.5);
+      opacity: 0; transform: translateY(12px);
+      transition: opacity .3s, transform .3s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.error { border-color: rgba(220,38,38,.5); color: #fca5a5; }
+
+    /* ── SESIONES ── */
+    .btn-sm.save  { background: rgba(52,116,93,.6); color: var(--text); border: 1px solid rgba(255,255,255,.25); }
+    .btn-sm.save:hover { background: rgba(52,116,93,.85); }
+    .btn-sm.load  { background: rgba(161,187,178,.2); color: var(--text); border: 1px solid rgba(255,255,255,.25); }
+    .btn-sm.load:hover { background: rgba(161,187,178,.35); }
+    .btn-sm.recent { background: rgba(230,188,108,.2); color: var(--warning); border: 1px solid rgba(230,188,108,.35); position: relative; }
+    .btn-sm.recent:hover { background: rgba(230,188,108,.3); }
+
+    /* ── MODAL GUARDAR SESIÓN ── */
+    #modal-guardar-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    #modal-guardar-overlay.visible { display: flex; }
+    #modal-guardar {
+      background: var(--surface);
+      border: 1.5px solid rgba(255,255,255,.22);
+      border-radius: 24px; padding: 2rem 2.25rem;
+      width: min(440px, 90vw); box-shadow: 0 24px 60px rgba(0,0,0,.6);
+      display: flex; flex-direction: column; gap: 1.1rem;
+    }
+    #modal-guardar h3 {
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: 1.1rem; font-weight: 600; color: var(--text);
+    }
+    #modal-guardar p  { font-size: .83rem; color: var(--text-muted); margin-top: -.4rem; }
+    #modal-nombre-sesion {
+      width: 100%; padding: .65rem .95rem;
+      background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.2);
+      border-radius: 12px; color: var(--text); font-size: .9rem;
+      font-family: 'Baloo Tamma 2', sans-serif; outline: none; transition: border-color .2s;
+    }
+    #modal-nombre-sesion::placeholder { color: rgba(160,186,177,.5); }
+    #modal-nombre-sesion:focus { border-color: rgba(255,255,255,.5); }
+    .modal-actions { display: flex; gap: .75rem; justify-content: flex-end; }
+    .modal-actions .btn-cancel {
+      padding: .5rem 1.2rem; border-radius: 9999px; font-size: .85rem; cursor: pointer;
+      background: transparent; color: var(--text-muted);
+      border: 1px solid rgba(255,255,255,.2);
+      font-family: 'Baloo Tamma 2', sans-serif;
+      transition: border-color .2s, color .2s;
+    }
+    .modal-actions .btn-cancel:hover { border-color: rgba(220,38,38,.5); color: #fca5a5; }
+    .modal-actions .btn-confirm {
+      padding: .5rem 1.5rem; border-radius: 9999px; font-size: .85rem; cursor: pointer;
+      background: var(--surface2); color: var(--text);
+      border: 1px solid rgba(255,255,255,.25);
+      font-family: 'Baloo Tamma 2', sans-serif; font-weight: 700;
+      box-shadow: 0 4px 7px rgba(0,0,0,.3);
+      transition: background .2s;
+    }
+    .modal-actions .btn-confirm:hover { background: #3d8a6e; }
+
+    /* ── HISTORIAL PANEL ── */
+    #historial-panel {
+      position: absolute; top: calc(100% + 8px); right: 0; z-index: 500;
+      background: var(--surface);
+      border: 1.5px solid rgba(255,255,255,.2);
+      border-radius: 20px; width: 350px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.5);
+      overflow: hidden; display: none;
+    }
+    #historial-panel.open { display: block; }
+    .hist-header {
+      background: rgba(0,0,0,.2); padding: .75rem 1rem;
+      font-family: 'Anek Bangla', sans-serif;
+      font-size: .9rem; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .hist-empty { padding: 1.3rem 1rem; color: var(--text-muted); font-size: .85rem; text-align: center; }
+    .hist-item {
+      display: flex; align-items: center; gap: .7rem; padding: .75rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer;
+      transition: background .15s;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item:hover { background: rgba(255,255,255,.07); }
+    .hist-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .hist-info { flex: 1; min-width: 0; }
+    .hist-nombre { font-size: .85rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hist-meta   { font-size: .73rem; color: var(--text-muted); margin-top: .1rem; }
+    .hist-actions { display: flex; flex-direction: column; gap: .3rem; flex-shrink: 0; }
+    .hist-btn {
+      background: none; border: none; cursor: pointer; padding: .2rem .5rem;
+      border-radius: 9999px; font-size: .72rem; font-weight: 600;
+      font-family: 'Baloo Tamma 2', sans-serif;
+      transition: background .15s;
+    }
+    .hist-btn.cargar { color: var(--text-muted); border: 1px solid rgba(255,255,255,.15); }
+    .hist-btn.cargar:hover { background: rgba(255,255,255,.12); color: var(--text); }
+    .hist-btn.borrar { color: rgba(220,38,38,.8); }
+    .hist-btn.borrar:hover { background: var(--danger-soft); color: #fca5a5; }
+    .hist-footer {
+      padding: .5rem 1rem; border-top: 1px solid rgba(255,255,255,.08);
+      display: flex; justify-content: flex-end;
+    }
+    .hist-clear-btn {
+      background: none; border: none; color: rgba(220,38,38,.7);
+      font-size: .75rem; cursor: pointer; padding: .2rem .6rem;
+      border-radius: 9999px; font-family: 'Baloo Tamma 2', sans-serif;
+    }
+    .hist-clear-btn:hover { background: var(--danger-soft); color: #fca5a5; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ TOAST ══════════════ -->
+<div id="toast"></div>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav>
+  <span class="nav-logo" style="font-family:'Megrim',cursive;font-size:1.6rem;font-weight:400;letter-spacing:.08em;color:transparent;-webkit-text-stroke:1.5px var(--text);text-shadow:0 0 18px rgba(226,221,207,.18);">OptiPlan</span>
+  <div class="nav-links">
+    <button onclick="showView('inicio')" id="nav-inicio" class="active">Inicio</button>
+    <button onclick="showView('datos')"  id="nav-datos">Ingresar Datos</button>
+    <button onclick="showView('resultados')" id="nav-resultados" class="nav-result-btn" style="display:none">Resultados</button>
+    <button onclick="showView('estadisticas')" id="nav-estadisticas" class="nav-result-btn" style="display:none">Estadísticas</button>
+    <button onclick="showView('escenarios')" id="nav-escenarios" class="nav-result-btn" style="display:none">Escenarios</button>
+    <button onclick="abrirInfoModal('modal-sobre')" id="nav-sobre">Sobre el Proyecto</button>
+    <button onclick="abrirInfoModal('modal-ayuda')" id="nav-ayuda">Ayuda</button>
+  </div>
+</nav>
+
+<!-- ══════════════ INICIO ══════════════ -->
+<div id="view-inicio" class="view active">
+  <canvas id="particles-canvas"></canvas>
+  <div class="hero-center">
+    <h1 class="megrim-title">OptiPlan</h1>
+    <p class="hero-desc">Planificación de Producción Multiperiodo<br/>Investigación de Operaciones</p>
+    <button class="btn-primary" onclick="showView('datos')">Ingresar datos</button>
+  </div>
+
+  <!-- Feature cards (below hero area, removed by overflow:hidden on view-inicio; kept for scroll reference) -->
+  <div style="display:none">
+    <div class="hero-feature-card">
+      <div class="hero-feature-icon">⚙️</div>
+      <div class="hero-feature-title">Optimización Lineal</div>
+      <div class="hero-feature-desc">Motor PuLP resuelve el plan óptimo de producción minimizando costos totales.</div>
+    </div>
+    <div class="hero-feature-card">
+      <div class="hero-feature-icon">📊</div>
+      <div class="hero-feature-title">Estadísticas Visuales</div>
+      <div class="hero-feature-desc">Gráficas interactivas de producción, costos, inventarios y más.</div>
+    </div>
+    <div class="hero-feature-card">
+      <div class="hero-feature-icon">🔍</div>
+      <div class="hero-feature-title">Análisis de Escenarios</div>
+      <div class="hero-feature-desc">Compara variaciones de demanda y capacidad para decisiones robustas.</div>
+    </div>
+    <div class="hero-feature-card">
+      <div class="hero-feature-icon">💾</div>
+      <div class="hero-feature-title">Sesiones Guardadas</div>
+      <div class="hero-feature-desc">Guarda y etiqueta tus escenarios para retomar el trabajo en cualquier momento.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ DATOS ══════════════ -->
+<div id="view-datos" class="view">
+  <div class="container">
+    <div class="page-title">Ingreso de Datos</div>
+
+    <div class="actions">
+      <button class="btn-sm success" onclick="resolver()">▶ Resolver</button>
+      <button class="btn-sm outline" onclick="datosAleatorios()">⚄ Datos aleatorios</button>
+      <button class="btn-sm outline" onclick="resetDatos()">↺ Limpiar</button>
+      <div style="margin-left:auto;display:flex;gap:.5rem;position:relative;" id="session-btns">
+        <button class="btn-sm save" onclick="guardarSesion()">Guardar</button>
+        <button class="btn-sm load" onclick="document.getElementById('fileInput').click()">Cargar</button>
+        <button class="btn-sm recent" onclick="toggleHistorial(event)" id="btn-recientes">Recientes</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none" onchange="cargarSesion(this)"/>
+        <div id="historial-panel">
+          <div class="hist-header">
+            <span>Sesiones recientes</span>
+            <span id="hist-count" style="font-size:.75rem;opacity:.7"></span>
+          </div>
+          <div id="historial-list"></div>
+          <div class="hist-footer">
+            <button class="hist-clear-btn" onclick="limpiarHistorial()">Borrar historial</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: nombre personalizado de sesión -->
+    <div id="modal-guardar-overlay" onclick="if(event.target===this)cerrarModalGuardar()">
+      <div id="modal-guardar">
+        <h3>Guardar sesión</h3>
+        <p>Ponle un nombre descriptivo para identificarla fácilmente en el historial.</p>
+        <input id="modal-nombre-sesion" type="text" maxlength="80"
+               placeholder="Ej. Escenario alta demanda Q3"
+               onkeydown="if(event.key==='Enter')confirmarGuardarSesion();if(event.key==='Escape')cerrarModalGuardar()"/>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="cerrarModalGuardar()">Cancelar</button>
+          <button class="btn-confirm" onclick="confirmarGuardarSesion()">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alert-datos"></div>
+
+    <!-- Config general -->
+    <div class="card">
+      <div class="card-title">Configuración General</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Número de periodos</label>
+          <input type="number" id="periodos" min="1" max="12" value="4" oninput="reconstruirTablas()"/>
+        </div>
+        <div class="form-group">
+          <label>Número de productos</label>
+          <input type="number" id="numProductos" min="1" max="6" value="3" oninput="reconstruirTablas()"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Productos -->
+    <div class="card">
+      <div class="card-title">Productos</div>
+      <div class="table-wrap">
+        <table id="tabla-productos">
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Precio ($/u)</th><th>Costo Prod.</th><th>Costo Sub.</th>
+              <th>Costo Inv.</th><th>Pen. Faltante</th><th>T. Corte (h/u)</th><th>T. Ensamble (h/u)</th>
+            </tr>
+          </thead>
+          <tbody id="body-productos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Demanda -->
+    <div class="card">
+      <div class="card-title">Demanda por Periodo</div>
+      <div class="table-wrap">
+        <table id="tabla-demanda">
+          <thead><tr id="head-demanda"></tr></thead>
+          <tbody id="body-demanda"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Capacidad -->
+    <div class="card">
+      <div class="card-title">Capacidades y Horas Extra</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Corte regular (h/mes)</label>
+          <input type="number" id="corteRegular" value="300" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Ensamble regular (h/mes)</label>
+          <input type="number" id="ensambleRegular" value="240" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>H. extra corte máx.</label>
+          <input type="number" id="extraCorte" value="60" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>H. extra ensamble máx.</label>
+          <input type="number" id="extraEnsamble" value="50" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Costo 1er tramo HE ($/h)</label>
+          <input type="number" id="costoHE1" value="20" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Costo 2do tramo HE ($/h)</label>
+          <input type="number" id="costoHE2" value="30" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Límite 1er tramo HE (h)</label>
+          <input type="number" id="limiteHE1" value="20" min="0"/>
+        </div>
+        <div class="form-group" style="flex-direction:row;align-items:center;gap:.5rem;padding-top:1.4rem;">
+          <input type="checkbox" id="reduccionP3" checked/>
+          <label style="font-size:.88rem;cursor:pointer;" for="reduccionP3">Reducción corte Mes 3 (−20%)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventario -->
+    <div class="card">
+      <div class="card-title">Inventarios</div>
+      <div class="table-wrap">
+        <table id="tabla-inventario">
+          <thead>
+            <tr>
+              <th>Producto</th><th>Inv. Inicial</th><th>Inv. Mínimo Final</th><th>Inv. Máximo</th>
+            </tr>
+          </thead>
+          <tbody id="body-inventario"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ RESULTADOS ══════════════ -->
+<div id="view-resultados" class="view">
+  <div class="container">
+    <div class="page-title">Resultados Obtenidos</div>
+    <div id="resultados-content">
+      <div class="alert info">⚡ Ingresa los datos y presiona <b>Resolver</b> para ver los resultados.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ESTADÍSTICAS ══════════════ -->
+<div id="view-estadisticas" class="view">
+  <div class="container">
+    <div class="page-title">Estadísticas</div>
+    <div id="estadisticas-content">
+      <div class="alert info">⚡ Resuelve el modelo para ver las estadísticas.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ESCENARIOS ══════════════ -->
+<div id="view-escenarios" class="view">
+  <div class="container">
+    <div class="page-title">Análisis de Escenarios</div>
+    <div id="escenarios-content">
+      <div class="alert info">⚡ Resuelve el modelo base primero para analizar escenarios.</div>
+    </div>
+    <button class="btn-sm success" id="btn-escenarios" onclick="analizarEscenarios()" style="display:none;">▶ Ejecutar Análisis</button>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL SOBRE EL PROYECTO ══════════════ -->
+<div id="modal-sobre" class="info-modal-overlay" onclick="if(event.target===this)cerrarInfoModal('modal-sobre')">
+  <div class="info-modal">
+    <div class="info-modal-header">
+      <button class="info-modal-close" onclick="cerrarInfoModal('modal-sobre')">✕</button>
+      <h2>Sobre el Proyecto</h2>
+    </div>
+    <div class="info-modal-body">
+      <div class="prose">
+        <h3>¿Qué es OptiPlan?</h3>
+        <p>OptiPlan es una herramienta de <b>Programación Lineal para Planificación de Producción Multiperiodo</b>. Permite a las empresas tomar decisiones óptimas sobre cuánto producir, subcontratar y almacenar en cada periodo, minimizando costos totales.</p>
+        <h3>Problema que resuelve</h3>
+        <p>Dado un conjunto de productos con demandas variables por periodo, capacidades de producción y restricciones de inventario, determina el plan óptimo que:</p>
+        <ul>
+          <li>Minimiza costos de producción, subcontratación, inventario, faltantes y horas extra.</li>
+          <li>Satisface la demanda de cada periodo.</li>
+          <li>Respeta las capacidades de corte y ensamble.</li>
+          <li>Mantiene inventarios dentro de los límites establecidos.</li>
+        </ul>
+        <h3>Tecnología</h3>
+        <span class="badge">Python</span>
+        <span class="badge">Flask</span>
+        <span class="badge">PuLP (LP Solver)</span>
+        <span class="badge">ReportLab (PDF)</span>
+        <span class="badge">Chart.js</span>
+        <h3>Desarrollado por</h3>
+        <p>Proyecto de Programación Lineal — Investigación de Operaciones<br/>Universidad · Junio 2026</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL AYUDA ══════════════ -->
+<div id="modal-ayuda" class="info-modal-overlay" onclick="if(event.target===this)cerrarInfoModal('modal-ayuda')">
+  <div class="info-modal">
+    <div class="info-modal-header">
+      <button class="info-modal-close" onclick="cerrarInfoModal('modal-ayuda')">✕</button>
+      <h2>Instrucciones de Uso</h2>
+    </div>
+    <div class="info-modal-body">
+      <div class="prose">
+        <h3>1. Ingresar Datos</h3>
+        <p>Ve a <b>Ingresar Datos</b> y completa:</p>
+        <ul>
+          <li><b>Productos:</b> precio de venta, costos y tiempos por unidad.</li>
+          <li><b>Demanda:</b> unidades requeridas por producto y periodo.</li>
+          <li><b>Capacidades:</b> horas de corte y ensamble disponibles, con opciones de horas extra.</li>
+          <li><b>Inventarios:</b> stock inicial, mínimo final y máximo por producto.</li>
+        </ul>
+        <h3>2. Resolver</h3>
+        <p>Presiona el botón <b>Resolver</b>. El solver PuLP (Python) calcula el plan óptimo de producción usando Programación Lineal.</p>
+        <h3>3. Ver Resultados</h3>
+        <p>En <b>Resultados</b> verás el desglose por periodo: producción, subcontrato, inventario, faltantes, costos e ingresos.</p>
+        <h3>4. Estadísticas</h3>
+        <p>Gráficas interactivas: producción por periodo, distribución de costos, niveles de inventario y comparación demanda vs. oferta.</p>
+        <h3>5. Escenarios</h3>
+        <p>Compara el plan base con variaciones de demanda y capacidad para tomar mejores decisiones.</p>
+        <h3>6. Exportar PDF</h3>
+        <p>En la sección Resultados, usa el botón <b>Exportar PDF</b> para descargar el reporte completo.</p>
+        <h3>💡 Nota</h3>
+        <p>Puedes usar <b>Datos aleatorios</b> para explorar el comportamiento del modelo con valores generados automáticamente.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ CHAT AI BUBBLE ══════════════ -->
+<!-- ══════════════ SIDE NAV ══════════════ -->
+<div id="side-nav">
+  <button class="side-dot active" data-section="inicio" title="Inicio" onclick="showView('inicio')"></button>
+  <button class="side-dot" data-section="datos" title="Ingresar Datos" onclick="showView('datos')"></button>
+  <button class="side-dot result-dot" data-section="resultados" title="Resultados" onclick="showView('resultados')"></button>
+  <button class="side-dot result-dot" data-section="estadisticas" title="Estadísticas" onclick="showView('estadisticas')"></button>
+  <button class="side-dot result-dot" data-section="escenarios" title="Escenarios" onclick="showView('escenarios')"></button>
+</div>
+
+<div id="ai-chat-bubble">
+  <div id="ai-chat-panel">
+    <div class="ai-chat-header">
+      <div class="ai-chat-avatar" style="font-family:'Megrim',cursive;font-size:1rem;letter-spacing:.1em;color:transparent;-webkit-text-stroke:1px rgba(226,221,207,.9);">IA</div>
+      <div>
+        <div class="ai-chat-name">Asistente OptiPlan</div>
+        <div class="ai-chat-status">Analiza tus resultados</div>
+      </div>
+      <button class="ai-chat-close" onclick="toggleChat()">✕</button>
+    </div>
+    <div class="ai-chat-messages" id="ai-chat-messages"></div>
+    <div class="ai-quick-btns" id="ai-quick-btns"></div>
+    <div class="ai-chat-input-row">
+      <input id="ai-chat-input" type="text" placeholder="Pregunta sobre los resultados…"
+             onkeydown="if(event.key==='Enter')enviarMensajeChat()"/>
+      <button id="ai-chat-send" onclick="enviarMensajeChat()">➤</button>
+    </div>
+  </div>
+  <button id="ai-chat-toggle" onclick="toggleChat()" title="Asistente IA">
+    <span class="ai-toggle-label">IA</span>
+    <span id="ai-chat-badge" style="display:none">!</span>
+  </button>
+</div>
+
+<!-- ══════════════ SCRIPTS ══════════════ -->
+<script>
+// ── Forzar scroll a inicio al cargar (evita restauración de posición) ──
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.addEventListener('DOMContentLoaded', () => { window.scrollTo(0, 0); });
+
+// ── Estado global ──────────────────────────────────────────────
+let resultado = null;
+let datosActuales = null;
+const chartInstances = {};
+
+const COLORES = ['#a1bbb2','#e2ddcf','#e6bc6c','#34745d','#f87171','#738780'];
+
+// ── Navegación ─────────────────────────────────────────────────
+const RESULT_VIEWS = ['resultados','estadisticas','escenarios'];
+
+const AI_CHAT_VIEWS = ['resultados','estadisticas','escenarios'];
+
+// ── Scroll a una sección por id ────────────────────────────────
+function showView(id) {
+  const el = document.getElementById('view-' + id);
+  if (!el) return;
+  // Si la sección aún no está revelada (resultados/estadísticas/escenarios) la revelamos primero
+  if (el.style.display === 'none' || (!el.classList.contains('revealed') &&
+      (id === 'resultados' || id === 'estadisticas' || id === 'escenarios'))) {
+    // Solo si ya tenemos resultados
+    if (resultado) revelarSeccion(id, false);
+    else return;
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setNavActive(id);
+}
+
+// Activa el botón de nav y el side dot correspondiente
+function setNavActive(id) {
+  document.querySelectorAll('.nav-links button[id^="nav-"]').forEach(b => b.classList.remove('active'));
+  const navEl = document.getElementById('nav-' + id);
+  if (navEl) navEl.classList.add('active');
+  // Side dots
+  document.querySelectorAll('.side-dot').forEach(d => d.classList.remove('active'));
+  const dot = document.querySelector(`.side-dot[data-section="${id}"]`);
+  if (dot) dot.classList.add('active');
+}
+
+// Revela una sección de resultados con animación y opcionalmente hace scroll
+function revelarSeccion(id, scrollTo = true) {
+  const el = document.getElementById('view-' + id);
+  if (!el) return;
+  el.classList.remove('revealed');
+  // Forzar reflow para reiniciar animación si ya estaba visible
+  void el.offsetWidth;
+  el.classList.add('revealed');
+  if (scrollTo) {
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }
+  setNavActive(id);
+  // Mostrar burbuja chat si aplica
+  const bubble = document.getElementById('ai-chat-bubble');
+  if (bubble && AI_CHAT_VIEWS.includes(id)) bubble.classList.add('visible');
+}
+
+// IntersectionObserver: actualiza nav activo mientras el usuario scrollea
+(function initScrollSpy() {
+  const sections = ['inicio','datos','resultados','estadisticas','escenarios'];
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id.replace('view-', '');
+        setNavActive(id);
+        // Chat bubble
+        const bubble = document.getElementById('ai-chat-bubble');
+        if (bubble) {
+          if (AI_CHAT_VIEWS.includes(id)) bubble.classList.add('visible');
+          else { bubble.classList.remove('visible'); closeChatPanel(); }
+        }
+      }
+    });
+  }, { threshold: 0.25 });
+  // Observar solo cuando el DOM esté listo
+  window.addEventListener('DOMContentLoaded', () => {
+    sections.forEach(id => {
+      const el = document.getElementById('view-' + id);
+      if (el) observer.observe(el);
+    });
+  });
+  // También lanzar ahora si ya cargó
+  if (document.readyState !== 'loading') {
+    sections.forEach(id => {
+      const el = document.getElementById('view-' + id);
+      if (el) observer.observe(el);
+    });
+  }
+})();
+
+// ── Snap scroll por JS (al llegar al borde de cada sección) ──────
+(function initSnapScroll() {
+  let snapCooldown = false;
+
+  function getVisibleSections() {
+    return ['inicio','datos','resultados','estadisticas','escenarios'].filter(id => {
+      const el = document.getElementById('view-' + id);
+      return el && getComputedStyle(el).display !== 'none';
+    });
+  }
+
+  window.addEventListener('wheel', function(e) {
+    if (snapCooldown) return;
+    const vh = window.innerHeight;
+    const scrollY = window.scrollY;
+    const sections = getVisibleSections();
+
+    // Sección más visible actualmente
+    let currentId = null;
+    let currentEl = null;
+    for (const id of sections) {
+      const el = document.getElementById('view-' + id);
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= vh * 0.55 && rect.bottom > vh * 0.1) {
+        currentId = id; currentEl = el;
+      }
+    }
+    if (!currentId) return;
+
+    const rect = currentEl.getBoundingClientRect();
+    const idx  = sections.indexOf(currentId);
+
+    if (e.deltaY > 0 && rect.bottom - vh <= 10 && idx < sections.length - 1) {
+      // Al fondo: saltar a la siguiente sección
+      const nextEl = document.getElementById('view-' + sections[idx + 1]);
+      if (nextEl) {
+        snapCooldown = true;
+        nextEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => snapCooldown = false, 900);
+      }
+    } else if (e.deltaY < 0 && rect.top >= -20 && idx > 0) {
+      // Al tope: saltar a la sección anterior
+      const prevEl = document.getElementById('view-' + sections[idx - 1]);
+      if (prevEl) {
+        snapCooldown = true;
+        prevEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => snapCooldown = false, 900);
+      }
+    }
+  }, { passive: true });
+})();
+
+// ── Modales de información ──────────────────────────────────────
+function abrirInfoModal(id) {
+  document.getElementById(id).classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+function cerrarInfoModal(id) {
+  document.getElementById(id).classList.remove('visible');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.info-modal-overlay.visible').forEach(m => {
+      m.classList.remove('visible'); document.body.style.overflow = '';
+    });
+  }
+});
+
+// ── Mostrar nav de resultados/estadísticas/escenarios ───────────
+function revelarNavResultados() {
+  ['nav-resultados','nav-estadisticas','nav-escenarios'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = '';
+  });
+  // Mostrar side dots de resultados
+  document.querySelectorAll('.side-dot.result-dot').forEach(d => d.classList.add('shown'));
+  // Revelar secciones en el DOM (sin scroll aún, el scroll lo hace resolver)
+  ['resultados','estadisticas'].forEach(id => {
+    const el = document.getElementById('view-' + id);
+    if (el && !el.classList.contains('revealed')) {
+      el.classList.add('revealed');
+    }
+  });
+}
+
+// ── Leer datos del formulario ──────────────────────────────────
+function leerNombresProductos() {
+  const n = parseInt(document.getElementById('numProductos').value) || 3;
+  const nombres = [];
+  for (let i = 0; i < n; i++) {
+    const el = document.getElementById(`prod-nombre-${i}`);
+    nombres.push(el ? el.value : String.fromCharCode(65 + i));
+  }
+  return nombres;
+}
+
+function leerDatos() {
+  const periodos = parseInt(document.getElementById('periodos').value) || 4;
+  const n = parseInt(document.getElementById('numProductos').value) || 3;
+  const nombres = leerNombresProductos();
+
+  const productos = [];
+  for (let i = 0; i < n; i++) {
+    productos.push({
+      nombre:       nombres[i],
+      precio:       parseFloat(document.getElementById(`prod-precio-${i}`)?.value) || 0,
+      costoProd:    parseFloat(document.getElementById(`prod-costoProd-${i}`)?.value) || 0,
+      costoSub:     parseFloat(document.getElementById(`prod-costoSub-${i}`)?.value) || 0,
+      costoInv:     parseFloat(document.getElementById(`prod-costoInv-${i}`)?.value) || 0,
+      penFaltante:  parseFloat(document.getElementById(`prod-penFaltante-${i}`)?.value) || 0,
+      tiempoCorte:  parseFloat(document.getElementById(`prod-tiempoCorte-${i}`)?.value) || 0,
+      tiempoEnsamble: parseFloat(document.getElementById(`prod-tiempoEnsamble-${i}`)?.value) || 0,
+    });
+  }
+
+  const demanda = [];
+  for (let t = 1; t <= periodos; t++) {
+    const d = { periodo: t };
+    for (const nm of nombres) {
+      d[nm] = parseFloat(document.getElementById(`dem-${t}-${nm}`)?.value) || 0;
+    }
+    demanda.push(d);
+  }
+
+  const capacidad = {
+    corteRegular:    parseFloat(document.getElementById('corteRegular').value) || 300,
+    ensambleRegular: parseFloat(document.getElementById('ensambleRegular').value) || 240,
+    extraCorte:      parseFloat(document.getElementById('extraCorte').value) || 60,
+    extraEnsamble:   parseFloat(document.getElementById('extraEnsamble').value) || 50,
+    costoHoraExtra1: parseFloat(document.getElementById('costoHE1').value) || 20,
+    costoHoraExtra2: parseFloat(document.getElementById('costoHE2').value) || 30,
+    limiteHoraExtra1:parseFloat(document.getElementById('limiteHE1').value) || 20,
+    reduccionCorteP3: document.getElementById('reduccionP3').checked,
+  };
+
+  const inventario = { maximo: 50 };
+  for (const nm of nombres) {
+    inventario[`inicial${nm}`]  = parseFloat(document.getElementById(`inv-ini-${nm}`)?.value) || 0;
+    inventario[`minFinal${nm}`] = parseFloat(document.getElementById(`inv-min-${nm}`)?.value) || 0;
+    inventario.maximo = parseFloat(document.getElementById(`inv-max-${nm}`)?.value) || 50;
+  }
+
+  return { periodos, productos, demanda, capacidad, inventario };
+}
+
+// ── Construir tablas dinámicas ─────────────────────────────────
+function reconstruirTablas() {
+  const n = parseInt(document.getElementById('numProductos').value) || 3;
+  const periodos = parseInt(document.getElementById('periodos').value) || 4;
+  const defaultsP = [
+    { precio:80, costoProd:32, costoSub:45, costoInv:4, penFaltante:20, tiempoCorte:1.5, tiempoEnsamble:1 },
+    { precio:95, costoProd:40, costoSub:58, costoInv:5, penFaltante:25, tiempoCorte:2,   tiempoEnsamble:1.5 },
+    { precio:70, costoProd:28, costoSub:39, costoInv:3, penFaltante:18, tiempoCorte:1,   tiempoEnsamble:.8 },
+  ];
+  const campos = ['precio','costoProd','costoSub','costoInv','penFaltante','tiempoCorte','tiempoEnsamble'];
+
+  // Guardar valores actuales
+  const prev = {};
+  document.querySelectorAll('[data-save]').forEach(el => { prev[el.dataset.save] = el.value; });
+
+  // Tabla productos
+  const bodyP = document.getElementById('body-productos');
+  bodyP.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = defaultsP[i] || defaultsP[0];
+    const nm = prev[`prod-nombre-${i}`] || String.fromCharCode(65 + i);
+    let row = `<tr><td><input type="text" id="prod-nombre-${i}" data-save="prod-nombre-${i}" value="${nm}" style="width:60px;" oninput="reconstruirTablas()"/></td>`;
+    for (const c of campos) {
+      const v = prev[`prod-${c}-${i}`] || d[c];
+      row += `<td><input type="number" id="prod-${c}-${i}" data-save="prod-${c}-${i}" value="${v}" step="0.1" min="0"/></td>`;
+    }
+    row += '</tr>';
+    bodyP.insertAdjacentHTML('beforeend', row);
+  }
+
+  // Tabla demanda
+  const nombres = [];
+  for (let i = 0; i < n; i++) {
+    const el = document.getElementById(`prod-nombre-${i}`);
+    nombres.push(el ? el.value : String.fromCharCode(65 + i));
+  }
+  const defaultsDem = [
+    { A:60,B:40,C:50,D:50,E:40,F:30 },
+    { A:75,B:50,C:60,D:60,E:55,F:40 },
+    { A:90,B:65,C:70,D:70,E:65,F:50 },
+    { A:85,B:70,C:75,D:75,E:70,F:55 },
+  ];
+  const head = document.getElementById('head-demanda');
+  head.innerHTML = '<th>Periodo</th>' + nombres.map(nm => `<th>${nm}</th>`).join('');
+  const bodyD = document.getElementById('body-demanda');
+  bodyD.innerHTML = '';
+  for (let t = 1; t <= periodos; t++) {
+    let row = `<tr><td class="name">Mes ${t}</td>`;
+    for (const nm of nombres) {
+      const defDem = defaultsDem[t-1] || defaultsDem[0];
+      const v = prev[`dem-${t}-${nm}`] || defDem[nm] || 50;
+      row += `<td><input type="number" id="dem-${t}-${nm}" data-save="dem-${t}-${nm}" value="${v}" min="0"/></td>`;
+    }
+    row += '</tr>';
+    bodyD.insertAdjacentHTML('beforeend', row);
+  }
+
+  // Tabla inventario
+  const bodyI = document.getElementById('body-inventario');
+  bodyI.innerHTML = '';
+  const defaultsInv = { A:{ini:10,min:8}, B:{ini:5,min:10}, C:{ini:15,min:6} };
+  for (const nm of nombres) {
+    const d = defaultsInv[nm] || { ini:5, min:5 };
+    const ini = prev[`inv-ini-${nm}`] || d.ini;
+    const min = prev[`inv-min-${nm}`] || d.min;
+    const max = prev[`inv-max-${nm}`] || 50;
+    bodyI.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td class="name">${nm}</td>
+        <td><input type="number" id="inv-ini-${nm}" data-save="inv-ini-${nm}" value="${ini}" min="0"/></td>
+        <td><input type="number" id="inv-min-${nm}" data-save="inv-min-${nm}" value="${min}" min="0"/></td>
+        <td><input type="number" id="inv-max-${nm}" data-save="inv-max-${nm}" value="${max}" min="0"/></td>
+      </tr>`);
+  }
+}
+
+// ── Datos aleatorios ───────────────────────────────────────────
+function datosAleatorios() {
+  const n = parseInt(document.getElementById('numProductos').value) || 3;
+  const periodos = parseInt(document.getElementById('periodos').value) || 4;
+  const rnd = (a, b) => +(a + Math.random()*(b-a)).toFixed(1);
+  const rndI = (a, b) => Math.floor(a + Math.random()*(b-a+1));
+
+  for (let i = 0; i < n; i++) {
+    const el = n => document.getElementById(n);
+    el(`prod-precio-${i}`).value      = rndI(60,130);
+    el(`prod-costoProd-${i}`).value   = rndI(20,60);
+    el(`prod-costoSub-${i}`).value    = rndI(35,80);
+    el(`prod-costoInv-${i}`).value    = rnd(2,10);
+    el(`prod-penFaltante-${i}`).value = rndI(10,40);
+    el(`prod-tiempoCorte-${i}`).value = rnd(.5,3);
+    el(`prod-tiempoEnsamble-${i}`).value = rnd(.5,2.5);
+  }
+  const nombres = leerNombresProductos();
+  for (let t = 1; t <= periodos; t++) {
+    for (const nm of nombres) {
+      const el = document.getElementById(`dem-${t}-${nm}`);
+      if (el) el.value = rndI(30,100);
+    }
+  }
+}
+
+// ── Reset ──────────────────────────────────────────────────────
+function resetDatos() {
+  // Limpiar configuración general
+  document.getElementById('periodos').value = 4;
+  document.getElementById('numProductos').value = 3;
+  // Limpiar capacidades
+  ['corteRegular','ensambleRegular','extraCorte','extraEnsamble','costoHE1','costoHE2','limiteHE1'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('reduccionP3').checked = false;
+  // Reconstruir tablas con valores vacíos
+  reconstruirTablas();
+  // Limpiar todos los inputs de las tablas dinámicas
+  setTimeout(() => {
+    document.querySelectorAll('#body-productos input, #body-demanda input, #body-inventario input').forEach(el => {
+      if (el.type === 'number') el.value = '';
+    });
+  }, 50);
+  document.getElementById('alert-datos').innerHTML = '';
+}
+
+// ── Resolver ───────────────────────────────────────────────────
+async function resolver() {
+  const alertEl = document.getElementById('alert-datos');
+  alertEl.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Resolviendo con PuLP…</div>';
+
+  datosActuales = leerDatos();
+
+  try {
+    const res = await fetch('/api/resolver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datosActuales)
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      const msg = data.detalles ? data.detalles.join('<br/>') : (data.error || 'Error desconocido');
+      alertEl.innerHTML = `<div class="alert error">❌ ${msg}</div>`;
+      return;
+    }
+
+    if (data.status === 'infeasible') {
+      alertEl.innerHTML = `<div class="alert error">⚠ ${data.mensaje}</div>`;
+      return;
+    }
+
+    resultado = data;
+    alertEl.innerHTML = '<div class="alert success">✓ Solución óptima encontrada. Puedes ver los resultados.</div>';
+
+    renderResultados();
+    renderEstadisticas();
+    revelarNavResultados();
+
+    document.getElementById('btn-escenarios').style.display = 'inline-block';
+    document.getElementById('escenarios-content').innerHTML =
+      '<div class="alert info">✓ Modelo resuelto. Presiona <b>Ejecutar Análisis</b> para comparar escenarios.</div>';
+
+    // Scroll suave directo a resultados con animación
+    revelarSeccion('resultados');
+  } catch (e) {
+    alertEl.innerHTML = `<div class="alert error">❌ Error de conexión: ${e.message}</div>`;
+  }
+}
+
+// ── Render Resultados ──────────────────────────────────────────
+function fmt(n) { return (n || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 }); }
+function fmtM(n) { return '$' + (n || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 }); }
+
+function renderResultados() {
+  if (!resultado) return;
+  const res = resultado;
+  const r = res.resumenCostos;
+  const nombres = datosActuales.productos.map(p => p.nombre);
+  const utilColor = r.utilidadTotal >= 0 ? '' : ' negative';
+
+  let html = `
+  <div class="actions">
+    <button class="btn-sm pdf" onclick="exportarPDF()">⬇ Exportar PDF</button>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><img src="/icon-chart.png" class="kpi-icon" alt=""/><div class="kpi-label">Ingreso Total</div><div class="kpi-value">${fmtM(r.ingresoTotal)}</div></div>
+    <div class="kpi"><img src="/icon-money.png" class="kpi-icon" alt=""/><div class="kpi-label">Costo Total</div><div class="kpi-value">${fmtM(r.costoTotal)}</div></div>
+    <div class="kpi"><img src="/icon-coins.png" class="kpi-icon" alt=""/><div class="kpi-label">Utilidad Total</div><div class="kpi-value${utilColor}">${fmtM(r.utilidadTotal)}</div></div>
+    <div class="kpi"><div class="kpi-label">Costo Producción</div><div class="kpi-value">${fmtM(r.costoProduccion)}</div></div>
+    <div class="kpi"><div class="kpi-label">Costo Subcontrato</div><div class="kpi-value">${fmtM(r.costoSubcontrato)}</div></div>
+    <div class="kpi"><div class="kpi-label">Costo Inventario</div><div class="kpi-value">${fmtM(r.costoInventario)}</div></div>
+    <div class="kpi"><div class="kpi-label">Faltantes</div><div class="kpi-value">${fmtM(r.costoFaltante)}</div></div>
+    <div class="kpi"><div class="kpi-label">Horas Extra</div><div class="kpi-value">${fmtM(r.costoHorasExtra)}</div></div>
+  </div>`;
+
+  for (const per of res.periodos) {
+    html += `
+    <div class="card">
+      <div class="card-title">Mes ${per.periodo}
+        <span style="margin-left:auto;font-size:.8rem;font-weight:400;color:var(--text-muted)">
+          Ingresos: <b style="color:var(--verde-claro)">${fmtM(per.ingresosPeriodo)}</b> &nbsp;|&nbsp;
+          Costos: <b>${fmtM(per.costosPeriodo)}</b> &nbsp;|&nbsp;
+          Utilidad: <b style="color:${per.utilidadPeriodo>=0?'var(--verde-claro)':'var(--danger)'}">${fmtM(per.utilidadPeriodo)}</b>
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Producto</th><th>Producción</th><th>Subcontrato</th><th>Inventario</th><th>Faltante</th></tr></thead>
+          <tbody>
+            ${nombres.map(nm => `
+            <tr>
+              <td class="name">${nm}</td>
+              <td>${fmt(per.produccion[nm])}</td>
+              <td>${fmt(per.subcontrato[nm])}</td>
+              <td>${fmt(per.inventario[nm])}</td>
+              <td style="color:${(per.faltante[nm]||0)>0?'var(--danger)':'inherit'}">${fmt(per.faltante[nm])}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:.6rem;font-size:.8rem;color:var(--text-muted);">
+        H.E. Corte: <b>${fmt(per.horasExtraCorte)} h</b> &nbsp;|&nbsp;
+        H.E. Ensamble: <b>${fmt(per.horasExtraEnsamble)} h</b> &nbsp;|&nbsp;
+        Total h. corte: <b>${fmt(per.totalHorasCorte)} h</b>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('resultados-content').innerHTML = html;
+}
+
+// ── Render Estadísticas ────────────────────────────────────────
+function renderEstadisticas() {
+  if (!resultado) return;
+  const res  = resultado;
+  const pers = res.periodos;
+  const nombres = datosActuales.productos.map(p => p.nombre);
+  const labels  = pers.map(p => `Mes ${p.periodo}`);
+
+  document.getElementById('estadisticas-content').innerHTML = `
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Producción por Periodo</div>
+        <div class="chart-wrap"><canvas id="ch-produccion"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Costos por Tipo / Periodo</div>
+        <div class="chart-wrap"><canvas id="ch-costos"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribución de Costos Totales</div>
+        <div class="chart-wrap"><canvas id="ch-pie"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Demanda vs. Producción + Subcontrato</div>
+        <div class="chart-wrap"><canvas id="ch-demanda"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Niveles de Inventario</div>
+        <div class="chart-wrap"><canvas id="ch-inventario"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Ingresos vs. Costos por Periodo</div>
+        <div class="chart-wrap"><canvas id="ch-utilidad"></canvas></div>
+      </div>
+    </div>`;
+
+  const defaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#a0bab1', font: { size: 11 } } } },
+    scales: {
+      x: { ticks: { color: '#a0bab1' }, grid: { color: 'rgba(255,255,255,.08)' } },
+      y: { ticks: { color: '#a0bab1' }, grid: { color: 'rgba(255,255,255,.08)' } },
+    }
+  };
+
+  // Producción
+  destroyChart('ch-produccion');
+  chartInstances['ch-produccion'] = new Chart(document.getElementById('ch-produccion'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: nombres.map((nm, i) => ({
+        label: nm,
+        data: pers.map(p => p.produccion[nm] || 0),
+        backgroundColor: COLORES[i] + 'cc',
+      }))
+    },
+    options: { ...defaults, scales: { ...defaults.scales, x: { ...defaults.scales.x, stacked: true }, y: { ...defaults.scales.y, stacked: true } } }
+  });
+
+  // Costos por tipo
+  destroyChart('ch-costos');
+  chartInstances['ch-costos'] = new Chart(document.getElementById('ch-costos'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Producción',   data: pers.map(p => p.costoProduccion),  backgroundColor: COLORES[0]+'cc' },
+        { label: 'Subcontrato',  data: pers.map(p => p.costoSubcontrato), backgroundColor: COLORES[1]+'cc' },
+        { label: 'Inventario',   data: pers.map(p => p.costoInventario),  backgroundColor: COLORES[2]+'cc' },
+        { label: 'Faltantes',    data: pers.map(p => p.costoFaltante),    backgroundColor: COLORES[4]+'cc' },
+        { label: 'Horas Extra',  data: pers.map(p => p.costoHorasExtra),  backgroundColor: COLORES[3]+'cc' },
+      ]
+    },
+    options: { ...defaults, scales: { ...defaults.scales, x: { ...defaults.scales.x, stacked: true }, y: { ...defaults.scales.y, stacked: true } } }
+  });
+
+  // Pie costos
+  const r = res.resumenCostos;
+  destroyChart('ch-pie');
+  chartInstances['ch-pie'] = new Chart(document.getElementById('ch-pie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Producción','Subcontrato','Inventario','Faltantes','Horas Extra'],
+      datasets: [{ data: [r.costoProduccion,r.costoSubcontrato,r.costoInventario,r.costoFaltante,r.costoHorasExtra], backgroundColor: COLORES }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a0bab1' } } } }
+  });
+
+  // Demanda vs oferta (primer producto)
+  destroyChart('ch-demanda');
+  const demTotal = pers.map((p,i) => {
+    const dp = datosActuales.demanda[i];
+    return nombres.reduce((s,nm) => s + (dp[nm]||0), 0);
+  });
+  const ofertaTotal = pers.map(p =>
+    nombres.reduce((s,nm) => s + (p.produccion[nm]||0) + (p.subcontrato[nm]||0), 0)
+  );
+  chartInstances['ch-demanda'] = new Chart(document.getElementById('ch-demanda'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Demanda Total',  data: demTotal,   borderColor: COLORES[4], backgroundColor: COLORES[4]+'33', tension:.4, fill:true },
+        { label: 'Prod.+Sub. Total', data: ofertaTotal, borderColor: COLORES[0], backgroundColor: COLORES[0]+'33', tension:.4, fill:true },
+      ]
+    },
+    options: defaults
+  });
+
+  // Inventario
+  destroyChart('ch-inventario');
+  chartInstances['ch-inventario'] = new Chart(document.getElementById('ch-inventario'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: nombres.map((nm, i) => ({
+        label: nm,
+        data: pers.map(p => p.inventario[nm] || 0),
+        borderColor: COLORES[i], backgroundColor: COLORES[i]+'22',
+        tension: .4, fill: true,
+      }))
+    },
+    options: defaults
+  });
+
+  // Utilidad por periodo
+  destroyChart('ch-utilidad');
+  chartInstances['ch-utilidad'] = new Chart(document.getElementById('ch-utilidad'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Ingresos',  data: pers.map(p => p.ingresosPeriodo),  backgroundColor: COLORES[0]+'cc' },
+        { label: 'Costos',    data: pers.map(p => p.costosPeriodo),    backgroundColor: COLORES[4]+'cc' },
+        { label: 'Utilidad',  data: pers.map(p => p.utilidadPeriodo),  backgroundColor: COLORES[2]+'cc', type: 'line', borderColor: COLORES[2], tension:.4 },
+      ]
+    },
+    options: defaults
+  });
+}
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+// ── Escenarios ─────────────────────────────────────────────────
+async function analizarEscenarios() {
+  const cont = document.getElementById('escenarios-content');
+  cont.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div>Analizando escenarios…</div>';
+
+  try {
+    const res = await fetch('/api/escenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datosActuales)
+    });
+    const data = await res.json();
+
+    const optimos = data.filter(e => e.resultado.status === 'optimal');
+    const maxUtil = Math.max(...optimos.map(e => e.resultado.utilidadTotal || 0));
+    const baseUtil = data[0]?.resultado?.utilidadTotal || 0;
+
+    let html = '<div class="esc-grid">';
+    for (let idx = 0; idx < data.length; idx++) {
+      const esc = data[idx];
+      const r = esc.resultado;
+      const ok = r.status === 'optimal';
+      const util = ok ? r.utilidadTotal : null;
+      const isBase = idx === 0;
+      const utilColor = !ok ? 'var(--danger)' : util >= maxUtil ? '#e2ddcf' : util >= 0 ? 'var(--accent2)' : 'var(--danger)';
+
+      // Delta vs base
+      let deltaHtml = '';
+      if (ok && !isBase) {
+        const delta = util - baseUtil;
+        const pct = baseUtil !== 0 ? ((delta / Math.abs(baseUtil)) * 100).toFixed(1) : 0;
+        const cls = delta >= 0 ? 'pos' : 'neg';
+        const sign = delta >= 0 ? '+' : '';
+        deltaHtml = `<span class="esc-delta ${cls}">${sign}${pct}% vs. base</span>`;
+      } else if (isBase && ok) {
+        deltaHtml = `<span class="esc-delta base">Escenario base</span>`;
+      }
+
+      const badgeCls = !ok ? 'infeasible' : '';
+      const badgeText = !ok ? 'Sin solución' : isBase ? 'Base' : 'Escenario';
+
+      html += `
+        <div class="esc-card">
+          <span class="esc-badge ${badgeCls}">${badgeText}</span>
+          <div class="esc-nombre">${esc.nombre}</div>
+          <div class="esc-desc">${esc.descripcion}</div>
+          <hr class="esc-divider"/>
+          <div class="esc-utilidad" style="color:${utilColor}">${ok ? fmtM(util) : 'Sin solución'}</div>
+          ${ok ? `<div class="esc-costo">Costo total: ${fmtM(r.resumenCostos.costoTotal)}</div>` : ''}
+          ${deltaHtml}
+        </div>`;
+    }
+    html += '</div>';
+
+    // Gráfica comparativa
+    html += `
+    <div class="chart-card" style="margin-top:1.5rem;">
+      <div class="chart-title">Utilidad estimada por escenario</div>
+      <div class="chart-wrap"><canvas id="ch-escenarios"></canvas></div>
+    </div>`;
+
+    cont.innerHTML = html;
+
+    // Ocultar el botón una vez ejecutado el análisis
+    document.getElementById('btn-escenarios').style.display = 'none';
+
+    // Revelar y scrollear a la sección de escenarios
+    revelarSeccion('escenarios');
+
+    destroyChart('ch-escenarios');
+    const escLabels = optimos.map(e => e.nombre);
+    const escUtils  = optimos.map(e => e.resultado.utilidadTotal);
+    chartInstances['ch-escenarios'] = new Chart(document.getElementById('ch-escenarios'), {
+      type: 'bar',
+      data: {
+        labels: escLabels,
+        datasets: [{ label: 'Utilidad ($)', data: escUtils,
+          backgroundColor: escUtils.map((v,i) => COLORES[i % COLORES.length] + 'cc') }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#a0bab1' }, grid: { color: 'rgba(255,255,255,.08)' } },
+          y: { ticks: { color: '#a0bab1' }, grid: { color: 'rgba(255,255,255,.08)' } },
+        }
+      }
+    });
+
+  } catch(e) {
+    cont.innerHTML = `<div class="alert error">❌ Error: ${e.message}</div>`;
+  }
+}
+
+// ── Exportar PDF ───────────────────────────────────────────────
+async function exportarPDF() {
+  if (!resultado || !datosActuales) return;
+  try {
+    const res = await fetch('/api/exportar-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resultado, datos: datosActuales })
+    });
+    if (!res.ok) { const e = await res.json(); alert('Error: ' + e.error); return; }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'OptiPlan_Resultados.pdf';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Error al generar PDF: ' + e.message);
+  }
+}
+
+// ── Historial localStorage ─────────────────────────────────────
+const HIST_KEY   = 'optiplan_historial';
+const HIST_MAX   = 8;
+
+function getHistorial() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveHistorial(h) {
+  localStorage.setItem(HIST_KEY, JSON.stringify(h));
+}
+
+function agregarAlHistorial(datos, nombrePersonalizado) {
+  const h = getHistorial();
+  const now = new Date();
+  const fecha = now.toISOString();
+  const prods  = datos.productos?.length || 0;
+  const pers   = datos.periodos || 0;
+  const nombre = nombrePersonalizado ||
+    `${prods} prod. · ${pers} periodos — ${now.toLocaleDateString('es-CL')} ${now.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit' })}`;
+
+  h.unshift({ nombre, fecha, datos });
+  saveHistorial(h.slice(0, HIST_MAX));
+  renderHistorialPanel();
+  actualizarBadge();
+}
+
+function renderHistorialPanel() {
+  const h = getHistorial();
+  const listEl  = document.getElementById('historial-list');
+  const countEl = document.getElementById('hist-count');
+  if (!listEl) return;
+
+  countEl.textContent = h.length ? `${h.length}/${HIST_MAX}` : '';
+
+  if (!h.length) {
+    listEl.innerHTML = '<div class="hist-empty">Sin sesiones guardadas todavía.<br/>Presiona Guardar para añadir.</div>';
+    return;
+  }
+
+  listEl.innerHTML = h.map((entry, i) => {
+    const d = new Date(entry.fecha);
+    const hace = tiempoRelativo(d);
+    const prods  = entry.datos?.productos?.length || '?';
+    const pers   = entry.datos?.periodos || '?';
+    return `
+    <div class="hist-item">
+      <span class="hist-icon">○</span>
+      <div class="hist-info">
+        <div class="hist-nombre" title="${entry.nombre}">${entry.nombre}</div>
+        <div class="hist-meta">${prods} productos · ${pers} periodos · ${hace}</div>
+      </div>
+      <div class="hist-actions">
+        <button class="hist-btn cargar" onclick="cargarDesdeHistorial(${i});event.stopPropagation()">▶ Cargar</button>
+        <button class="hist-btn borrar" onclick="borrarDelHistorial(${i});event.stopPropagation()">✕ Borrar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function actualizarBadge() {
+  const btn = document.getElementById('btn-recientes');
+  if (!btn) return;
+  const n = getHistorial().length;
+  btn.textContent = n ? `Recientes (${n})` : 'Recientes';
+}
+
+function tiempoRelativo(fecha) {
+  const diff = Math.floor((Date.now() - fecha.getTime()) / 1000);
+  if (diff < 60)   return 'hace un momento';
+  if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+  if (diff < 86400)return `hace ${Math.floor(diff/3600)} h`;
+  return `hace ${Math.floor(diff/86400)} días`;
+}
+
+function toggleHistorial(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('historial-panel');
+  const isOpen = panel.classList.contains('open');
+  document.querySelectorAll('#historial-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) {
+    renderHistorialPanel();
+    panel.classList.add('open');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('session-btns')?.contains(e.target)) {
+    document.getElementById('historial-panel')?.classList.remove('open');
+  }
+});
+
+function cargarDesdeHistorial(i) {
+  const h = getHistorial();
+  const entry = h[i];
+  if (!entry) return;
+  aplicarDatos(entry.datos);
+  document.getElementById('historial-panel').classList.remove('open');
+  const d = new Date(entry.fecha);
+  showToast(`✓ Sesión cargada: ${d.toLocaleDateString('es-CL')} ${d.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})}`);
+  document.getElementById('alert-datos').innerHTML =
+    `<div class="alert success">Sesión cargada: <b>${entry.nombre}</b>. Revisa los datos y presiona Resolver.</div>`;
+}
+
+function borrarDelHistorial(i) {
+  const h = getHistorial();
+  h.splice(i, 1);
+  saveHistorial(h);
+  renderHistorialPanel();
+  actualizarBadge();
+  showToast('Sesión eliminada del historial');
+}
+
+function limpiarHistorial() {
+  if (!confirm('¿Eliminar todo el historial de sesiones?')) return;
+  localStorage.removeItem(HIST_KEY);
+  renderHistorialPanel();
+  actualizarBadge();
+  showToast('Historial eliminado');
+}
+
+function aplicarDatos(datos) {
+  document.getElementById('periodos').value     = datos.periodos;
+  document.getElementById('numProductos').value = datos.productos.length;
+
+  const cap = datos.capacidad || {};
+  document.getElementById('corteRegular').value    = cap.corteRegular    ?? 300;
+  document.getElementById('ensambleRegular').value = cap.ensambleRegular ?? 240;
+  document.getElementById('extraCorte').value      = cap.extraCorte      ?? 60;
+  document.getElementById('extraEnsamble').value   = cap.extraEnsamble   ?? 50;
+  document.getElementById('costoHE1').value        = cap.costoHoraExtra1 ?? 20;
+  document.getElementById('costoHE2').value        = cap.costoHoraExtra2 ?? 30;
+  document.getElementById('limiteHE1').value       = cap.limiteHoraExtra1?? 20;
+  document.getElementById('reduccionP3').checked   = cap.reduccionCorteP3 ?? true;
+
+  reconstruirTablas();
+
+  const poblar = () => {
+    datos.productos.forEach((p, i) => {
+      const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      s(`prod-nombre-${i}`,        p.nombre);
+      s(`prod-precio-${i}`,        p.precio);
+      s(`prod-costoProd-${i}`,     p.costoProd);
+      s(`prod-costoSub-${i}`,      p.costoSub);
+      s(`prod-costoInv-${i}`,      p.costoInv);
+      s(`prod-penFaltante-${i}`,   p.penFaltante);
+      s(`prod-tiempoCorte-${i}`,   p.tiempoCorte);
+      s(`prod-tiempoEnsamble-${i}`,p.tiempoEnsamble);
+    });
+    const nombres = datos.productos.map(p => p.nombre);
+    datos.demanda.forEach(d => {
+      nombres.forEach(nm => {
+        const el = document.getElementById(`dem-${d.periodo}-${nm}`);
+        if (el) el.value = d[nm] ?? 0;
+      });
+    });
+    const inv = datos.inventario || {};
+    nombres.forEach(nm => {
+      const s = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      s(`inv-ini-${nm}`,  inv[`inicial${nm}`]  ?? 0);
+      s(`inv-min-${nm}`,  inv[`minFinal${nm}`] ?? 0);
+      s(`inv-max-${nm}`,  inv.maximo            ?? 50);
+    });
+  };
+
+  poblar();
+  reconstruirTablas();
+  poblar();
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, tipo = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = tipo === 'error' ? 'error show' : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = el.className.replace(' show','').replace('show',''); }, 3000);
+}
+
+// ── Guardar sesión ─────────────────────────────────────────────
+function guardarSesion() {
+  const overlay = document.getElementById('modal-guardar-overlay');
+  const input   = document.getElementById('modal-nombre-sesion');
+  input.value   = '';
+  overlay.classList.add('visible');
+  setTimeout(() => input.focus(), 80);
+}
+
+function cerrarModalGuardar() {
+  document.getElementById('modal-guardar-overlay').classList.remove('visible');
+}
+
+function confirmarGuardarSesion() {
+  const input  = document.getElementById('modal-nombre-sesion');
+  const nombre = input.value.trim();
+  cerrarModalGuardar();
+
+  const datos = leerDatos();
+  const ahora = new Date();
+  const sesion = { version: '1.0', fecha: ahora.toISOString(), datos };
+
+  // 1. Guardar en historial con nombre personalizado (o auto-generado si queda vacío)
+  agregarAlHistorial(datos, nombre || undefined);
+
+  // 2. Descargar como archivo JSON con nombre descriptivo en el filename
+  const slug     = nombre ? nombre.replace(/[^a-zA-Z0-9áéíóúñüÁÉÍÓÚÑÜ _-]/g, '').replace(/\s+/g, '_').slice(0, 40) : ahora.toISOString().slice(0, 10);
+  const blob = new Blob([JSON.stringify(sesion, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `OptiPlan_${slug}.json`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast(`✓ Sesión "${nombre || 'sin nombre'}" guardada en historial y como JSON`);
+}
+
+// ── Cargar sesión desde archivo ────────────────────────────────
+function cargarSesion(inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const sesion = JSON.parse(e.target.result);
+      const datos  = sesion.datos || sesion;
+
+      if (!datos.periodos || !datos.productos || !datos.demanda) {
+        showToast('❌ Archivo inválido: faltan campos obligatorios', 'error');
+        return;
+      }
+
+      // Aplicar datos al formulario
+      aplicarDatos(datos);
+
+      // Guardar en historial automáticamente
+      agregarAlHistorial(datos, `📁 ${file.name.replace('.json','')}`);
+
+      const fecha = sesion.fecha ? new Date(sesion.fecha).toLocaleString('es-CL') : 'desconocida';
+      showToast(`✓ Sesión cargada y añadida al historial`);
+      document.getElementById('alert-datos').innerHTML =
+        `<div class="alert success">📂 Cargado desde <b>${file.name}</b> (guardado el ${fecha}). Revisa los datos y presiona Resolver.</div>`;
+
+    } catch(err) {
+      showToast('❌ Error al leer el archivo JSON', 'error');
+      console.error(err);
+    }
+    inputEl.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ── Init ───────────────────────────────────────────────────────
+reconstruirTablas();
+actualizarBadge();
+
+// ════════════════════════════════════════════════════════════════
+// CHAT AI — Asistente inteligente de resultados
+// ════════════════════════════════════════════════════════════════
+
+let chatOpen = false;
+let chatInitialized = false;
+
+const PREGUNTAS_RAPIDAS = [
+  '¿Cuál es el costo total?',
+  '¿Hay faltantes en algún periodo?',
+  '¿Qué periodo es el más costoso?',
+  '¿Cuál es la utilidad neta?',
+  '¿Se usaron horas extra?',
+  'Dame una interpretación general',
+  '¿Qué producto genera más ingreso?',
+  '¿Cómo está el inventario?',
+  'Recomiéndame acciones',
+];
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  const panel = document.getElementById('ai-chat-panel');
+  const badge = document.getElementById('ai-chat-badge');
+  if (chatOpen) {
+    panel.classList.add('open');
+    badge.style.display = 'none';
+    if (!chatInitialized) iniciarChat();
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+function closeChatPanel() {
+  chatOpen = false;
+  const panel = document.getElementById('ai-chat-panel');
+  if (panel) panel.classList.remove('open');
+}
+
+function iniciarChat() {
+  chatInitialized = true;
+  const msgsEl = document.getElementById('ai-chat-messages');
+  msgsEl.innerHTML = '';
+  agregarMensajeChat('bot', '¡Hola! Soy el asistente de OptiPlan 🤖<br/>Puedo analizar los resultados del modelo, darte interpretaciones y recomendaciones. ¿Qué quieres saber?');
+  renderQuickBtns();
+}
+
+function renderQuickBtns() {
+  const el = document.getElementById('ai-quick-btns');
+  el.innerHTML = PREGUNTAS_RAPIDAS.map(q =>
+    `<button class="ai-quick-btn" onclick="preguntaRapida(this,'${q.replace(/'/g,"\\'")}')"> ${q}</button>`
+  ).join('');
+}
+
+function preguntaRapida(btn, q) {
+  btn.disabled = true;
+  btn.style.opacity = '.4';
+  enviarMensajeChat(q);
+}
+
+function agregarMensajeChat(rol, html) {
+  const el = document.getElementById('ai-chat-messages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${rol}`;
+  div.innerHTML = html;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  return div;
+}
+
+function enviarMensajeChat(textoForzado) {
+  const input = document.getElementById('ai-chat-input');
+  const pregunta = (textoForzado || input.value).trim();
+  if (!pregunta) return;
+  input.value = '';
+
+  agregarMensajeChat('user', pregunta);
+
+  const typingDiv = agregarMensajeChat('bot', '<i>Analizando…</i>');
+  typingDiv.classList.add('typing');
+
+  setTimeout(() => {
+    const respuesta = generarRespuestaIA(pregunta);
+    typingDiv.classList.remove('typing');
+    typingDiv.innerHTML = respuesta;
+    const el = document.getElementById('ai-chat-messages');
+    el.scrollTop = el.scrollHeight;
+  }, 520 + Math.random() * 300);
+}
+
+function generarRespuestaIA(q) {
+  const texto = q.toLowerCase();
+
+  if (!resultado) {
+    return '⚠️ Aún no hay resultados disponibles. Ingresa los datos y presiona <b>Resolver</b> primero para que pueda analizar el caso.';
+  }
+
+  const r = resultado.resumenCostos;
+  const periodos = resultado.periodos;
+  const nombres = datosActuales?.productos?.map(p => p.nombre) || [];
+
+  // ── Costo total ─────────────────────────────────────────────
+  if (texto.includes('costo total') || texto.includes('cuánto costó') || texto.includes('cuanto costo')) {
+    const pct = r.costoTotal > 0 ? ((r.costoProduccion / r.costoTotal)*100).toFixed(1) : 0;
+    return `💰 <b>Costo Total: ${fmtM(r.costoTotal)}</b><br/>
+    • Producción: ${fmtM(r.costoProduccion)} (${pct}%)<br/>
+    • Subcontrato: ${fmtM(r.costoSubcontrato)}<br/>
+    • Inventario: ${fmtM(r.costoInventario)}<br/>
+    • Faltantes: ${fmtM(r.costoFaltante)}<br/>
+    • Horas extra: ${fmtM(r.costoHorasExtra)}<br/><br/>
+    ${r.costoSubcontrato > r.costoProduccion * 0.3 ? '⚠️ El subcontrato representa una parte significativa del costo. Considera ampliar capacidad propia.' : '✅ La estructura de costos es eficiente.'}`;
+  }
+
+  // ── Faltantes ───────────────────────────────────────────────
+  if (texto.includes('faltante') || texto.includes('escasez') || texto.includes('demanda insatisfecha')) {
+    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
+    const periodosFaltante = periodos.filter(p => nombres.some(nm => (p.faltante[nm]||0) > 0));
+    if (totalFaltante === 0) {
+      return '✅ <b>No hay faltantes</b> en ningún periodo. El modelo satisface el 100% de la demanda en todos los períodos. Excelente planificación.';
+    }
+    let detalle = periodosFaltante.map(p => {
+      const fs = nombres.filter(nm => (p.faltante[nm]||0) > 0).map(nm => `${nm}: ${fmt(p.faltante[nm])} u`).join(', ');
+      return `Mes ${p.periodo}: ${fs}`;
+    }).join('<br/>');
+    return `⚠️ <b>Faltantes detectados — Total: ${fmt(totalFaltante)} u</b><br/>${detalle}<br/><br/>
+    💡 <b>Recomendación:</b> Considera aumentar la capacidad de producción o el nivel de subcontratación en los periodos afectados para evitar penalizaciones de ${fmtM(r.costoFaltante)}.`;
+  }
+
+  // ── Periodo más costoso ──────────────────────────────────────
+  if (texto.includes('periodo') && (texto.includes('costoso') || texto.includes('caro') || texto.includes('mayor costo'))) {
+    const maxPer = periodos.reduce((a,b) => a.costosPeriodo > b.costosPeriodo ? a : b);
+    const minPer = periodos.reduce((a,b) => a.costosPeriodo < b.costosPeriodo ? a : b);
+    return `📊 <b>Periodo más costoso: Mes ${maxPer.periodo}</b> con ${fmtM(maxPer.costosPeriodo)}<br/>
+    Periodo más económico: Mes ${minPer.periodo} con ${fmtM(minPer.costosPeriodo)}<br/><br/>
+    La diferencia entre el mes más caro y el más barato es <b>${fmtM(maxPer.costosPeriodo - minPer.costosPeriodo)}</b>.<br/>
+    ${maxPer.costoHorasExtra > 0 ? `⏰ En el Mes ${maxPer.periodo} se usaron ${fmt(maxPer.horasExtraCorte + maxPer.horasExtraEnsamble)} h de horas extra, contribuyendo al costo elevado.` : ''}`;
+  }
+
+  // ── Utilidad ─────────────────────────────────────────────────
+  if (texto.includes('utilidad') || texto.includes('ganancia') || texto.includes('beneficio')) {
+    const utilColor = r.utilidadTotal >= 0 ? '🟢' : '🔴';
+    const margen = r.ingresoTotal > 0 ? ((r.utilidadTotal / r.ingresoTotal)*100).toFixed(1) : 0;
+    return `${utilColor} <b>Utilidad Total: ${fmtM(r.utilidadTotal)}</b><br/>
+    Ingresos: ${fmtM(r.ingresoTotal)}<br/>
+    Costos: ${fmtM(r.costoTotal)}<br/>
+    Margen neto: <b>${margen}%</b><br/><br/>
+    ${r.utilidadTotal >= 0
+      ? `✅ El plan es <b>rentable</b>. ${margen > 20 ? 'El margen del ' + margen + '% es muy saludable.' : 'El margen puede mejorar reduciendo costos de subcontrato o faltantes.'}`
+      : '❌ El plan genera <b>pérdida</b>. Revisa si los precios de venta cubren los costos de producción y si hay exceso de penalizaciones por faltantes.'}`;
+  }
+
+  // ── Horas extra ──────────────────────────────────────────────
+  if (texto.includes('hora') || texto.includes('extra') || texto.includes('overtime')) {
+    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
+    if (totalHE === 0) {
+      return '✅ <b>No se usaron horas extra</b> en ningún periodo. La capacidad regular fue suficiente para cubrir la producción planificada.';
+    }
+    const detalle = periodos.filter(p => (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0) > 0).map(p =>
+      `Mes ${p.periodo}: corte ${fmt(p.horasExtraCorte)} h + ensamble ${fmt(p.horasExtraEnsamble)} h`
+    ).join('<br/>');
+    return `⏰ <b>Horas extra utilizadas — Total: ${fmt(totalHE)} h</b><br/>Costo total HE: ${fmtM(r.costoHorasExtra)}<br/>${detalle}<br/><br/>
+    💡 Si las horas extra son recurrentes, evalúa aumentar la capacidad regular para reducir el costo de ${fmtM(r.costoHorasExtra)}.`;
+  }
+
+  // ── Interpretación general ───────────────────────────────────
+  if (texto.includes('interpretación') || texto.includes('interpretacion') || texto.includes('general') || texto.includes('resumen')) {
+    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
+    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
+    const margen = r.ingresoTotal > 0 ? ((r.utilidadTotal / r.ingresoTotal)*100).toFixed(1) : 0;
+    const semaforo = r.utilidadTotal >= 0 && totalFaltante === 0 ? '🟢' : r.utilidadTotal >= 0 ? '🟡' : '🔴';
+    return `${semaforo} <b>Interpretación General del Plan Óptimo</b><br/><br/>
+    El modelo de programación lineal encontró una <b>solución óptima</b> para ${periodos.length} periodos con ${nombres.length} productos.<br/><br/>
+    📊 <b>Financiero:</b> Ingresos ${fmtM(r.ingresoTotal)}, costos ${fmtM(r.costoTotal)}, utilidad <b>${fmtM(r.utilidadTotal)}</b> (margen ${margen}%)<br/>
+    📦 <b>Demanda:</b> ${totalFaltante === 0 ? 'Satisfecha al 100% ✅' : `Faltantes de ${fmt(totalFaltante)} u ⚠️`}<br/>
+    ⏰ <b>Capacidad:</b> ${totalHE === 0 ? 'No se requirieron horas extra ✅' : `Se usaron ${fmt(totalHE)} h extra`}<br/><br/>
+    ${r.costoSubcontrato > 0 ? `🔄 Se recurrió a subcontratación por ${fmtM(r.costoSubcontrato)}.` : '✅ No se requirió subcontratación.'}`;
+  }
+
+  // ── Producto con más ingreso ─────────────────────────────────
+  if (texto.includes('producto') && (texto.includes('ingreso') || texto.includes('venta') || texto.includes('genera'))) {
+    if (!datosActuales?.productos) return 'Necesito los datos de productos para responder esto.';
+    const ingresos = nombres.map(nm => {
+      const precio = datosActuales.productos.find(p => p.nombre === nm)?.precio || 0;
+      const totalProd = periodos.reduce((s,p) => s + (p.produccion[nm]||0) + (p.subcontrato[nm]||0), 0);
+      return { nm, ingreso: precio * totalProd, precio, totalProd };
+    });
+    ingresos.sort((a,b) => b.ingreso - a.ingreso);
+    const top = ingresos[0];
+    const lista = ingresos.map(i => `${i.nm}: ${fmtM(i.ingreso)} (${fmt(i.totalProd)} u × $${i.precio})`).join('<br/>');
+    return `💹 <b>Producto con mayor ingreso: ${top.nm}</b><br/><br/>Desglose por producto:<br/>${lista}`;
+  }
+
+  // ── Inventario ───────────────────────────────────────────────
+  if (texto.includes('inventario') || texto.includes('stock') || texto.includes('almacen')) {
+    const totalInv = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.inventario[nm]||0), 0), 0);
+    const ultimoPer = periodos[periodos.length - 1];
+    const invFinal = nombres.map(nm => `${nm}: ${fmt(ultimoPer.inventario[nm]||0)} u`).join(', ');
+    return `📦 <b>Análisis de Inventario</b><br/>
+    Costo total de inventario: <b>${fmtM(r.costoInventario)}</b><br/>
+    Inventario final (Mes ${ultimoPer.periodo}): ${invFinal}<br/><br/>
+    ${r.costoInventario > r.costoTotal * 0.2
+      ? '⚠️ El costo de inventario es alto (>20% del costo total). Considera reducir stock mantenido entre periodos.'
+      : '✅ El costo de inventario está en niveles razonables.'}`;
+  }
+
+  // ── Recomendaciones ─────────────────────────────────────────
+  if (texto.includes('recomienda') || texto.includes('accion') || texto.includes('acción') || texto.includes('mejorar') || texto.includes('sugerencia')) {
+    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
+    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
+    const recs = [];
+    if (totalFaltante > 0) recs.push(`🔴 <b>Reducir faltantes:</b> Hay ${fmt(totalFaltante)} u sin cubrir. Incrementa capacidad o subcontratación en periodos críticos.`);
+    if (r.costoSubcontrato > r.costoTotal * 0.25) recs.push(`🟡 <b>Revisar subcontratación:</b> Representa más del 25% del costo. Evalúa si conviene ampliar capacidad interna.`);
+    if (totalHE > 0) recs.push(`🟡 <b>Gestión de horas extra:</b> Se usaron ${fmt(totalHE)} h extra. Analiza si la contratación de personal permanente sería más económica.`);
+    if (r.costoInventario > r.costoTotal * 0.15) recs.push(`🟡 <b>Optimizar inventario:</b> El costo de almacenamiento es elevado. Considera políticas JIT para reducirlo.`);
+    if (r.utilidadTotal >= 0 && totalFaltante === 0 && totalHE === 0) recs.push(`🟢 <b>Plan óptimo alcanzado:</b> Sin faltantes, sin horas extra y con utilidad positiva. El plan actual es muy eficiente.`);
+    if (recs.length === 0) recs.push('🟢 El plan muestra un desempeño sólido. Mantén los parámetros actuales y monitorea cambios en la demanda.');
+    return `💡 <b>Recomendaciones estratégicas:</b><br/><br/>${recs.join('<br/><br/>')}`;
+  }
+
+  // ── Respuesta genérica ───────────────────────────────────────
+  const hints = ['costo total', 'faltantes', 'periodo más costoso', 'utilidad', 'horas extra', 'interpretación general', 'producto con más ingreso', 'inventario', 'recomendaciones'];
+  return `🤔 No encontré una coincidencia exacta para "<i>${q}</i>".<br/><br/>Puedo ayudarte con:<br/>• ${hints.join('<br/>• ')}<br/><br/>O usa los botones de preguntas rápidas de abajo.`;
+}
+
+// ── Partículas animadas (home) ──────────────────────────────────
+(function initParticles() {
+  const canvas = document.getElementById('particles-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, dots;
+
+  const N = 68;
+  const PALETTE = ['rgba(226,221,207,', 'rgba(52,116,93,', 'rgba(161,187,178,', 'rgba(230,188,108,'];
+
+  function resize() {
+    W = canvas.width  = canvas.offsetWidth  || window.innerWidth;
+    H = canvas.height = canvas.offsetHeight || window.innerHeight;
+  }
+
+  function makeDot() {
+    const base = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    return {
+      x:  Math.random() * W,
+      y:  Math.random() * H,
+      r:  2 + Math.random() * 4,
+      vx: (Math.random() - 0.5) * 0.55,
+      vy: (Math.random() - 0.5) * 0.55,
+      alpha: 0.12 + Math.random() * 0.45,
+      base
+    };
+  }
+
+  function init() {
+    resize();
+    dots = Array.from({ length: N }, makeDot);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // connecting lines
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const dx = dots[i].x - dots[j].x;
+        const dy = dots[i].y - dots[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 130) {
+          const alpha = (1 - dist / 130) * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(dots[i].x, dots[i].y);
+          ctx.lineTo(dots[j].x, dots[j].y);
+          ctx.strokeStyle = `rgba(226,221,207,${alpha})`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // dots
+    for (const d of dots) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = d.base + d.alpha + ')';
+      ctx.fill();
+
+      d.x += d.vx;
+      d.y += d.vy;
+      if (d.x < -10) d.x = W + 10;
+      if (d.x > W + 10) d.x = -10;
+      if (d.y < -10) d.y = H + 10;
+      if (d.y > H + 10) d.y = -10;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  init();
+  draw();
+
+  window.addEventListener('resize', () => {
+    resize();
+    dots.forEach(d => {
+      if (d.x > W) d.x = Math.random() * W;
+      if (d.y > H) d.y = Math.random() * H;
+    });
+  });
+})();
+</script>
+</body>
+</html>
