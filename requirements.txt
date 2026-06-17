@@ -1,5 +1,5 @@
 flask>=3.0.0
 pulp>=2.8.0
 reportlab>=4.1.0
-# pywebview es opcional — solo necesario si quieres la app de escritorio (ventana nativa)
-# Para instalarlo: pip install pywebview>=5.0.0
+requests>=2.31.0
+python-dotenv>=1.0.0

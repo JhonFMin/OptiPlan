@@ -2515,7 +2515,7 @@ function agregarMensajeChat(rol, html) {
   return div;
 }
 
-function enviarMensajeChat(textoForzado) {
+async function enviarMensajeChat(textoForzado) {
   const input = document.getElementById('ai-chat-input');
   const pregunta = (textoForzado || input.value).trim();
   if (!pregunta) return;
@@ -2526,147 +2526,41 @@ function enviarMensajeChat(textoForzado) {
   const typingDiv = agregarMensajeChat('bot', '<i>Analizando…</i>');
   typingDiv.classList.add('typing');
 
-  setTimeout(() => {
-    const respuesta = generarRespuestaIA(pregunta);
-    typingDiv.classList.remove('typing');
-    typingDiv.innerHTML = respuesta;
-    const el = document.getElementById('ai-chat-messages');
-    el.scrollTop = el.scrollHeight;
-  }, 520 + Math.random() * 300);
-}
+  // Construir contexto con los datos actuales del modelo
+  const contexto = (resultado && datosActuales)
+    ? { resultado, datosActuales }
+    : null;
 
-function generarRespuestaIA(q) {
-  const texto = q.toLowerCase();
-
-  if (!resultado) {
-    return '⚠️ Aún no hay resultados disponibles. Ingresa los datos y presiona <b>Resolver</b> primero para que pueda analizar el caso.';
-  }
-
-  const r = resultado.resumenCostos;
-  const periodos = resultado.periodos;
-  const nombres = datosActuales?.productos?.map(p => p.nombre) || [];
-
-  // ── Costo total ─────────────────────────────────────────────
-  if (texto.includes('costo total') || texto.includes('cuánto costó') || texto.includes('cuanto costo')) {
-    const pct = r.costoTotal > 0 ? ((r.costoProduccion / r.costoTotal)*100).toFixed(1) : 0;
-    return `💰 <b>Costo Total: ${fmtM(r.costoTotal)}</b><br/>
-    • Producción: ${fmtM(r.costoProduccion)} (${pct}%)<br/>
-    • Subcontrato: ${fmtM(r.costoSubcontrato)}<br/>
-    • Inventario: ${fmtM(r.costoInventario)}<br/>
-    • Faltantes: ${fmtM(r.costoFaltante)}<br/>
-    • Horas extra: ${fmtM(r.costoHorasExtra)}<br/><br/>
-    ${r.costoSubcontrato > r.costoProduccion * 0.3 ? '⚠️ El subcontrato representa una parte significativa del costo. Considera ampliar capacidad propia.' : '✅ La estructura de costos es eficiente.'}`;
-  }
-
-  // ── Faltantes ───────────────────────────────────────────────
-  if (texto.includes('faltante') || texto.includes('escasez') || texto.includes('demanda insatisfecha')) {
-    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
-    const periodosFaltante = periodos.filter(p => nombres.some(nm => (p.faltante[nm]||0) > 0));
-    if (totalFaltante === 0) {
-      return '✅ <b>No hay faltantes</b> en ningún periodo. El modelo satisface el 100% de la demanda en todos los períodos. Excelente planificación.';
-    }
-    let detalle = periodosFaltante.map(p => {
-      const fs = nombres.filter(nm => (p.faltante[nm]||0) > 0).map(nm => `${nm}: ${fmt(p.faltante[nm])} u`).join(', ');
-      return `Mes ${p.periodo}: ${fs}`;
-    }).join('<br/>');
-    return `⚠️ <b>Faltantes detectados — Total: ${fmt(totalFaltante)} u</b><br/>${detalle}<br/><br/>
-    💡 <b>Recomendación:</b> Considera aumentar la capacidad de producción o el nivel de subcontratación en los periodos afectados para evitar penalizaciones de ${fmtM(r.costoFaltante)}.`;
-  }
-
-  // ── Periodo más costoso ──────────────────────────────────────
-  if (texto.includes('periodo') && (texto.includes('costoso') || texto.includes('caro') || texto.includes('mayor costo'))) {
-    const maxPer = periodos.reduce((a,b) => a.costosPeriodo > b.costosPeriodo ? a : b);
-    const minPer = periodos.reduce((a,b) => a.costosPeriodo < b.costosPeriodo ? a : b);
-    return `📊 <b>Periodo más costoso: Mes ${maxPer.periodo}</b> con ${fmtM(maxPer.costosPeriodo)}<br/>
-    Periodo más económico: Mes ${minPer.periodo} con ${fmtM(minPer.costosPeriodo)}<br/><br/>
-    La diferencia entre el mes más caro y el más barato es <b>${fmtM(maxPer.costosPeriodo - minPer.costosPeriodo)}</b>.<br/>
-    ${maxPer.costoHorasExtra > 0 ? `⏰ En el Mes ${maxPer.periodo} se usaron ${fmt(maxPer.horasExtraCorte + maxPer.horasExtraEnsamble)} h de horas extra, contribuyendo al costo elevado.` : ''}`;
-  }
-
-  // ── Utilidad ─────────────────────────────────────────────────
-  if (texto.includes('utilidad') || texto.includes('ganancia') || texto.includes('beneficio')) {
-    const utilColor = r.utilidadTotal >= 0 ? '🟢' : '🔴';
-    const margen = r.ingresoTotal > 0 ? ((r.utilidadTotal / r.ingresoTotal)*100).toFixed(1) : 0;
-    return `${utilColor} <b>Utilidad Total: ${fmtM(r.utilidadTotal)}</b><br/>
-    Ingresos: ${fmtM(r.ingresoTotal)}<br/>
-    Costos: ${fmtM(r.costoTotal)}<br/>
-    Margen neto: <b>${margen}%</b><br/><br/>
-    ${r.utilidadTotal >= 0
-      ? `✅ El plan es <b>rentable</b>. ${margen > 20 ? 'El margen del ' + margen + '% es muy saludable.' : 'El margen puede mejorar reduciendo costos de subcontrato o faltantes.'}`
-      : '❌ El plan genera <b>pérdida</b>. Revisa si los precios de venta cubren los costos de producción y si hay exceso de penalizaciones por faltantes.'}`;
-  }
-
-  // ── Horas extra ──────────────────────────────────────────────
-  if (texto.includes('hora') || texto.includes('extra') || texto.includes('overtime')) {
-    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
-    if (totalHE === 0) {
-      return '✅ <b>No se usaron horas extra</b> en ningún periodo. La capacidad regular fue suficiente para cubrir la producción planificada.';
-    }
-    const detalle = periodos.filter(p => (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0) > 0).map(p =>
-      `Mes ${p.periodo}: corte ${fmt(p.horasExtraCorte)} h + ensamble ${fmt(p.horasExtraEnsamble)} h`
-    ).join('<br/>');
-    return `⏰ <b>Horas extra utilizadas — Total: ${fmt(totalHE)} h</b><br/>Costo total HE: ${fmtM(r.costoHorasExtra)}<br/>${detalle}<br/><br/>
-    💡 Si las horas extra son recurrentes, evalúa aumentar la capacidad regular para reducir el costo de ${fmtM(r.costoHorasExtra)}.`;
-  }
-
-  // ── Interpretación general ───────────────────────────────────
-  if (texto.includes('interpretación') || texto.includes('interpretacion') || texto.includes('general') || texto.includes('resumen')) {
-    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
-    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
-    const margen = r.ingresoTotal > 0 ? ((r.utilidadTotal / r.ingresoTotal)*100).toFixed(1) : 0;
-    const semaforo = r.utilidadTotal >= 0 && totalFaltante === 0 ? '🟢' : r.utilidadTotal >= 0 ? '🟡' : '🔴';
-    return `${semaforo} <b>Interpretación General del Plan Óptimo</b><br/><br/>
-    El modelo de programación lineal encontró una <b>solución óptima</b> para ${periodos.length} periodos con ${nombres.length} productos.<br/><br/>
-    📊 <b>Financiero:</b> Ingresos ${fmtM(r.ingresoTotal)}, costos ${fmtM(r.costoTotal)}, utilidad <b>${fmtM(r.utilidadTotal)}</b> (margen ${margen}%)<br/>
-    📦 <b>Demanda:</b> ${totalFaltante === 0 ? 'Satisfecha al 100% ✅' : `Faltantes de ${fmt(totalFaltante)} u ⚠️`}<br/>
-    ⏰ <b>Capacidad:</b> ${totalHE === 0 ? 'No se requirieron horas extra ✅' : `Se usaron ${fmt(totalHE)} h extra`}<br/><br/>
-    ${r.costoSubcontrato > 0 ? `🔄 Se recurrió a subcontratación por ${fmtM(r.costoSubcontrato)}.` : '✅ No se requirió subcontratación.'}`;
-  }
-
-  // ── Producto con más ingreso ─────────────────────────────────
-  if (texto.includes('producto') && (texto.includes('ingreso') || texto.includes('venta') || texto.includes('genera'))) {
-    if (!datosActuales?.productos) return 'Necesito los datos de productos para responder esto.';
-    const ingresos = nombres.map(nm => {
-      const precio = datosActuales.productos.find(p => p.nombre === nm)?.precio || 0;
-      const totalProd = periodos.reduce((s,p) => s + (p.produccion[nm]||0) + (p.subcontrato[nm]||0), 0);
-      return { nm, ingreso: precio * totalProd, precio, totalProd };
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta, contexto })
     });
-    ingresos.sort((a,b) => b.ingreso - a.ingreso);
-    const top = ingresos[0];
-    const lista = ingresos.map(i => `${i.nm}: ${fmtM(i.ingreso)} (${fmt(i.totalProd)} u × $${i.precio})`).join('<br/>');
-    return `💹 <b>Producto con mayor ingreso: ${top.nm}</b><br/><br/>Desglose por producto:<br/>${lista}`;
+
+    const data = await resp.json();
+    typingDiv.classList.remove('typing');
+
+    if (!resp.ok || data.error) {
+      typingDiv.innerHTML = `⚠️ ${data.error || 'Error al conectar con el asistente. Intenta de nuevo.'}`;
+      return;
+    }
+
+    // Convertir saltos de línea a <br> y *texto* a <b>texto</b>
+    const html = data.respuesta
+      .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+      .replace(/\*(.*?)\*/g, '<b>$1</b>')
+      .replace(/
+/g, '<br/>');
+
+    typingDiv.innerHTML = html;
+  } catch (err) {
+    typingDiv.classList.remove('typing');
+    typingDiv.innerHTML = '⚠️ No se pudo conectar con el asistente. Verifica tu conexión.';
   }
 
-  // ── Inventario ───────────────────────────────────────────────
-  if (texto.includes('inventario') || texto.includes('stock') || texto.includes('almacen')) {
-    const totalInv = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.inventario[nm]||0), 0), 0);
-    const ultimoPer = periodos[periodos.length - 1];
-    const invFinal = nombres.map(nm => `${nm}: ${fmt(ultimoPer.inventario[nm]||0)} u`).join(', ');
-    return `📦 <b>Análisis de Inventario</b><br/>
-    Costo total de inventario: <b>${fmtM(r.costoInventario)}</b><br/>
-    Inventario final (Mes ${ultimoPer.periodo}): ${invFinal}<br/><br/>
-    ${r.costoInventario > r.costoTotal * 0.2
-      ? '⚠️ El costo de inventario es alto (>20% del costo total). Considera reducir stock mantenido entre periodos.'
-      : '✅ El costo de inventario está en niveles razonables.'}`;
-  }
-
-  // ── Recomendaciones ─────────────────────────────────────────
-  if (texto.includes('recomienda') || texto.includes('accion') || texto.includes('acción') || texto.includes('mejorar') || texto.includes('sugerencia')) {
-    const totalFaltante = periodos.reduce((s,p) => s + nombres.reduce((ss,nm) => ss + (p.faltante[nm]||0), 0), 0);
-    const totalHE = periodos.reduce((s,p) => s + (p.horasExtraCorte||0) + (p.horasExtraEnsamble||0), 0);
-    const recs = [];
-    if (totalFaltante > 0) recs.push(`🔴 <b>Reducir faltantes:</b> Hay ${fmt(totalFaltante)} u sin cubrir. Incrementa capacidad o subcontratación en periodos críticos.`);
-    if (r.costoSubcontrato > r.costoTotal * 0.25) recs.push(`🟡 <b>Revisar subcontratación:</b> Representa más del 25% del costo. Evalúa si conviene ampliar capacidad interna.`);
-    if (totalHE > 0) recs.push(`🟡 <b>Gestión de horas extra:</b> Se usaron ${fmt(totalHE)} h extra. Analiza si la contratación de personal permanente sería más económica.`);
-    if (r.costoInventario > r.costoTotal * 0.15) recs.push(`🟡 <b>Optimizar inventario:</b> El costo de almacenamiento es elevado. Considera políticas JIT para reducirlo.`);
-    if (r.utilidadTotal >= 0 && totalFaltante === 0 && totalHE === 0) recs.push(`🟢 <b>Plan óptimo alcanzado:</b> Sin faltantes, sin horas extra y con utilidad positiva. El plan actual es muy eficiente.`);
-    if (recs.length === 0) recs.push('🟢 El plan muestra un desempeño sólido. Mantén los parámetros actuales y monitorea cambios en la demanda.');
-    return `💡 <b>Recomendaciones estratégicas:</b><br/><br/>${recs.join('<br/><br/>')}`;
-  }
-
-  // ── Respuesta genérica ───────────────────────────────────────
-  const hints = ['costo total', 'faltantes', 'periodo más costoso', 'utilidad', 'horas extra', 'interpretación general', 'producto con más ingreso', 'inventario', 'recomendaciones'];
-  return `🤔 No encontré una coincidencia exacta para "<i>${q}</i>".<br/><br/>Puedo ayudarte con:<br/>• ${hints.join('<br/>• ')}<br/><br/>O usa los botones de preguntas rápidas de abajo.`;
+  const el = document.getElementById('ai-chat-messages');
+  el.scrollTop = el.scrollHeight;
 }
 
 // ── Partículas animadas (home) ──────────────────────────────────

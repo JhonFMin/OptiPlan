@@ -9,9 +9,11 @@ def _mod_disponible(nombre):
         return False
 
 _PAQUETES = {
-    "flask":      "flask>=3.0.0",
-    "pulp":       "pulp>=2.8.0",
-    "reportlab":  "reportlab>=4.1.0",
+    "flask":     "flask>=3.0.0",
+    "pulp":      "pulp>=2.8.0",
+    "reportlab": "reportlab>=4.1.0",
+    "requests":  "requests>=2.31.0",
+    "dotenv":    "python-dotenv>=1.0.0",
 }
 _faltantes = [paq for mod, paq in _PAQUETES.items() if not _mod_disponible(mod)]
 
@@ -29,6 +31,8 @@ if _faltantes:
 # ────────────────────────────────────────────────────────────────
 
 import threading, webbrowser
+from dotenv import load_dotenv
+load_dotenv()  # carga .env automáticamente
 from flask import send_from_directory
 from backend import create_app
 from config import Config
