@@ -1,6 +1,6 @@
 import sys, os, subprocess
 
-# ── Auto-instalador ──────────────────────────────────────────────
+# ── Auto-instalador ─______─────────────────────────────────────────────
 def _mod_disponible(nombre):
     try:
         __import__(nombre)
